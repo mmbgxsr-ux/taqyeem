@@ -40,22 +40,34 @@ button.alt{background:#fff;color:var(--acc);border:1px solid var(--acc)}
 #bar i{display:block;height:100%;width:0;background:var(--ok);transition:width .2s}
 video{width:100%;max-height:60vh;background:#000;border-radius:8px;margin-top:10px}
 .tb{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;justify-content:center}.tb input{min-width:0;width:62px;padding:4px}button.sm{padding:3px 9px;font-size:.85rem}
+.steps{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;display:flex;gap:6px;overflow-x:auto;background:var(--bg);padding:8px 0;margin-bottom:10px}
+.stp{flex:1;min-width:92px;background:var(--card);color:var(--mut);border:1px solid var(--line);font-size:.9rem;padding:8px 6px}
+.stp.cur{background:var(--acc);color:#fff;border-color:var(--acc)}
+.stp.done{color:var(--ok);border-color:var(--ok)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:10}
+section,#grid{scroll-margin-top:70px}
+@media (pointer:coarse){button,.btn{min-height:46px}button.sm{min-height:42px;padding:6px 14px}select,input[type=number],input[type=text]{min-height:46px}input[type=checkbox]{width:22px;height:22px}#grid{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}}
+@media (prefers-color-scheme:dark){.stp.cur{color:#0d1424}}
+.chk{font-size:.82rem;margin-top:6px;padding:4px 8px;border-radius:6px}
+.chk.ok{background:#e1f3e8;color:#14673a}.chk.warn{background:#fff1d6;color:#8a5200}.chk.bad{background:#fde3e1;color:#a3221b}
+@media (prefers-color-scheme:dark){.chk.ok{background:#173a2a;color:#9fe0b9}.chk.warn{background:#3d2f10;color:#f2c879}.chk.bad{background:#40201d;color:#f4a8a2}}
 .note{color:var(--mut);font-size:.88rem;margin:8px 0 0}
 </style>
 </head>
 <body>
 <main>
 <h1>فيديو حل التقييمات</h1>
+<nav class="steps" id="steps"></nav>
 <p class="sub">ضع صور الصفحات، والبرنامج يقصّها ويحوّلها إلى 16:9 ثم فيديو مضغوط.</p>
 
-<section>
+<section id="s1">
   <h2>١. الصفحات</h2>
   <div id="drop" tabindex="0" role="button">اضغط هنا لاختيار صور أو ملفات PDF للصفحات، أو اسحبها وأفلتها</div>
   <input type="file" id="files" accept="image/*,application/pdf" multiple hidden>
   <p class="note" id="info">لم يتم اختيار صفحات بعد. تُرتَّب الصفحات حسب اسم الملف.</p>
 </section>
 
-<section>
+<section id="s2">
   <h2>٢. القص</h2>
   <div class="row">
     <label>عدد القطع في كل صفحة
@@ -66,6 +78,7 @@ video{width:100%;max-height:60vh;background:#000;border-radius:8px;margin-top:10
     </label>
     <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="enh" checked> تحسين الصفحات الممسوحة (الميل والوضوح)</label>
     <button id="cut" disabled>قصّ الصفحات</button>
+    <button class="alt" id="undo" disabled>↩ تراجع</button>
   </div>
   <p class="note">يبحث البرنامج عن أقرب فراغ بين الأسئلة ليقص عنده، ثم يقص الهوامش البيضاء. اضغط على صورة أي قطعة لاستبعادها. تحت كل قطعة أزرار للترتيب (→ ←) والتقسيم (✂) والدمج مع التالية، وخانة لمدتها الخاصة بالثواني.</p>
   <div id="grid"></div>
@@ -87,12 +100,14 @@ video{width:100%;max-height:60vh;background:#000;border-radius:8px;margin-top:10
     <label>ملف الكتاب (PDF ممسوح ضوئياً)<input type="file" id="book" accept="application/pdf"></label>
     <label>من صفحة<input type="number" id="p1" min="1" value="1"></label>
     <label>إلى صفحة<input type="number" id="p2" min="1" value="3"></label>
+    <label>نوع الإجابة<select id="amode"><option value="b">مختصرة</option><option value="x">مع شرح قصير</option></select></label>
     <button id="ext">استخرج الإجابات</button>
+    <button class="alt" id="chk">راجع الإجابات</button>
   </div>
   <p class="note" id="ast">اختر صفحات الدرس فقط من الكتاب (عدد محدود). يقرأ Claude الصفحات ويكتب إجابة كل قطعة، وراجعها وعدّلها قبل الفيديو.</p>
 </section>
 
-<section>
+<section id="s4">
   <h2>٤. الفيديو</h2>
   <div class="row">
     <label>مدة كل قطعة (ثانية)
@@ -106,6 +121,7 @@ video{width:100%;max-height:60vh;background:#000;border-radius:8px;margin-top:10
     </label>
     <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="fast" checked> تسجيل سريع</label>
     <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="hand" checked> الإجابة بخط اليد</label>
+    <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="scr" checked> تمرير الأسئلة الطويلة</label>
     <button id="make" disabled>اصنع الفيديو</button>
   </div>
   <div class="row" style="margin-top:12px">
@@ -115,6 +131,14 @@ video{width:100%;max-height:60vh;background:#000;border-radius:8px;margin-top:10
   </div>
   <div id="lessons"></div>
   <details id="projd" style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">المشاريع المحفوظة</summary><div id="proj" style="margin-top:8px"></div></details>
+  <details id="libd" style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">مكتبة الإجابات (<span id="libn">0</span>)</summary>
+    <div class="row" style="margin-top:8px">
+      <button class="alt" id="libsave" disabled>احفظ إجابات هذا الدرس في المكتبة</button>
+      <button class="alt" id="libuse" disabled>استدعِ الإجابات المحفوظة</button>
+      <button class="alt" id="libclr">مسح المكتبة</button>
+    </div>
+    <p class="note">تُحفظ الإجابات مع بصمة صورة السؤال. وإذا تكرر سؤال مشابه في تقييم آخر تُستدعى إجابته. المطابقة بالصورة تقريبية، فتأكد من كل إجابة مستدعاة. الإجابات المعلّمة بـ"خاطئة" لا تُحفظ.</p>
+  </details>
   <p class="note">لعمل عدة فيديوهات دفعة واحدة: جهّز درساً، اضغط "إضافة الدرس للقائمة"، ثم اختر صفحات الدرس التالي. بعدها يصنع الزر كل الفيديوهات، وكل واحد بملف منفصل.</p>
   <div class="row" style="margin-top:12px">
     <label>ملف الصوت (اختياري)<input type="file" id="aud" accept="audio/*"></label>
@@ -179,7 +203,7 @@ async function load(list){
   }
   $('info').textContent='تم تحميل '+pages.length+' صفحة.'+bad;
   $('cut').disabled=!pages.length;
-  pieces=[];$('grid').innerHTML='';$('make').disabled=true;
+  pieces=[];hist=[];$('grid').innerHTML='';$('make').disabled=true;updSteps();
 }
 
 /* ---- القص ---- */
@@ -212,7 +236,7 @@ function bbox(ctx,w,h,thr){
 }
 $('cut').onclick=async()=>{
   const n=Math.max(1,Math.min(12,+$('parts').value||1)),thr=+$('sens').value;
-  $('cut').disabled=true;pieces=[];pageCuts=[];pgc=[];$('grid').innerHTML='';
+  snap();$('cut').disabled=true;pieces=[];pageCuts=[];pgc=[];$('grid').innerHTML='';
   for(let p=0;p<pages.length;p++){
     $('info').textContent='جارٍ قص الصفحة '+(p+1)+' من '+pages.length+'...';
     await new Promise(r=>setTimeout(r));
@@ -242,7 +266,8 @@ $('cut').onclick=async()=>{
 };
 const gs=()=>Math.max(1,+$('sec').value||6);
 const dur=p=>p.d>0?p.d:gs();
-let audio=null,lessons=[],pageCuts=[],pgc=[];
+let audio=null,lessons=[],pageCuts=[],pgc=[],hist=[];
+function snap(){if(pieces.length){hist.push(pieces.slice());if(hist.length>30)hist.shift()}}
 function updTot(){
   const sel=pieces.filter(p=>p.keep),t=sel.reduce((a,p)=>a+dur(p),0);
   $('tot').textContent=sel.length?'مدة الفيديو: '+Math.round(t)+' ثانية'+(audio?'، ومدة الصوت: '+Math.round(audio.duration)+' ثانية':''):'';
@@ -267,27 +292,28 @@ function mkPiece(src,y0,ph){
   const f=document.createElement('canvas');f.width=bw;f.height=bh;f.getContext('2d').drawImage(t,bx,by,bw,bh,0,0,bw,bh);return f;
 }
 function split(i){
-  const p=pieces[i],h=p.c.height;if(h<80)return;
+  const p=pieces[i],h=p.c.height;if(h<80)return;snap();
   const x=p.c.getContext('2d',{willReadFrequently:true});
   const pts=splitPoints(inkRows(x,p.c.width,h,+$('sens').value),h,2);
   const a=mkPiece(p.c,0,pts[1]),b=mkPiece(p.c,pts[1],h-pts[1]);if(!a||!b)return;
   pieces.splice(i,1,{c:a,keep:true,pg:p.pg,label:p.label+' (أ)'},{c:b,keep:true,pg:p.pg,label:p.label+' (ب)'});draw();
 }
 function merge(i){
+  snap();
   const a=pieces[i],b=pieces[i+1],w=Math.max(a.c.width,b.c.width),g=30;
   const c=document.createElement('canvas');c.width=w;c.height=a.c.height+b.c.height+g;
   const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);
   x.drawImage(a.c,(w-a.c.width)/2,0);x.drawImage(b.c,(w-b.c.width)/2,a.c.height+g);
   pieces.splice(i,2,{c,keep:true,pg:a.pg,label:a.label+' + دمج'});draw();
 }
-function mv(i,k){const j=i+k;[pieces[i],pieces[j]]=[pieces[j],pieces[i]];draw()}
+function mv(i,k){snap();const j=i+k;[pieces[i],pieces[j]]=[pieces[j],pieces[i]];draw()}
 function draw(){
   const g=$('grid');g.innerHTML='';
   pieces.forEach((pc,i)=>{
     const d=document.createElement('div');d.className='th'+(pc.keep?'':' off');
-    const v=document.createElement('canvas');v.width=320;v.height=180;frame(v.getContext('2d'),320,180,pc.c,pc.ans);
+    const v=document.createElement('canvas');v.width=320;v.height=180;frame(v.getContext('2d'),320,180,pc.c,pc.ans,1,pc.k);
     v.onclick=()=>{pc.keep=!pc.keep;d.classList.toggle('off',!pc.keep);upd()};
-    const s=document.createElement('small');s.textContent=pc.label;
+    const s=document.createElement('small');s.textContent=pc.label+(layout(pc.c,1280,720,!!pc.ans&&$('hand').checked).sc?' • تمرير تلقائي':'');
     const t=document.createElement('div');t.className='tb';
     const mk=(txt,tip,fn,dis)=>{const b=document.createElement('button');b.className='alt sm';b.textContent=txt;b.title=tip;b.disabled=!!dis;b.onclick=fn;return b};
     const inp=document.createElement('input');inp.type='number';inp.min=1;inp.max=300;inp.placeholder=gs();inp.value=pc.d||'';inp.title='مدة هذه القطعة بالثواني';
@@ -296,12 +322,40 @@ function draw(){
       mk('✂','قسّم القطعة نصفين',()=>split(i)),mk('دمج','ادمج مع التالية',()=>merge(i),i==pieces.length-1),inp);
     const ta=document.createElement('textarea');ta.rows=2;ta.placeholder='الإجابة (اكتبها أو عدّلها)';ta.value=pc.ans||'';
     ta.style.cssText='width:100%;margin-top:6px;font:inherit;font-size:.85rem;border:1px solid var(--line);border-radius:6px;padding:4px;background:transparent;color:inherit';
-    ta.oninput=()=>{pc.ans=ta.value};ta.onchange=()=>frame(v.getContext('2d'),320,180,pc.c,pc.ans);
-    d.append(v,s,t,ta);g.append(d);
+    ta.oninput=()=>{pc.ans=ta.value;pc.chk='';pc.lib=false};ta.onchange=()=>frame(v.getContext('2d'),320,180,pc.c,pc.ans,1,pc.k);
+    const cr=document.createElement('div');cr.className='tb';
+    const sl=document.createElement('select');sl.style.minWidth='0';sl.title='لون القلم';
+    [['','قلم أزرق'],['g','أخضر ✓'],['r','أحمر ✗']].forEach(o=>sl.add(new Option(o[1],o[0])));
+    sl.value=pc.k||'';sl.onchange=()=>{pc.k=sl.value;frame(v.getContext('2d'),320,180,pc.c,pc.ans,1,pc.k)};
+    cr.append(sl);
+    if(S){const rb=mk('أعد الاستخراج','أعد استخراج إجابة هذه القطعة',async()=>{
+      rb.disabled=true;
+      try{await askOne(pc,await bookBlobs());draw()}
+      catch(e){$('ast').textContent='تعذر الاستخراج: '+((e&&e.message)||e);rb.disabled=false}
+    });cr.append(rb)}
+    d.append(v,s,t,ta,cr);
+    if(pc.lib&&!pc.chk){const lb=document.createElement('div');lb.className='chk warn';lb.textContent='↺ من المكتبة: تأكد أنها نفس السؤال';d.append(lb)}
+    if(pc.chk){
+      const b=document.createElement('div');b.className='chk '+pc.chk;
+      b.textContent=(pc.chk==='ok'?'✓ سليمة':pc.chk==='bad'?'✗ خاطئة':'⚠ مشكوك فيها')+(pc.note?': '+pc.note:'');d.append(b);
+      if(pc.chk==='bad'&&pc.fix)d.append(mk('اعتمد الإجابة الصحيحة','استبدل الإجابة بالمقترحة',()=>{pc.ans=pc.fix;pc.chk='';pc.fix='';draw()}));
+    }
+    g.append(d);
   });
   upd();
 }
-function upd(){const k=pieces.some(p=>p.keep);$('save').disabled=!pieces.length;$('make').disabled=!(lessons.length||k);$('addl').disabled=!k;updTot()}
+function upd(){const k=pieces.some(p=>p.keep);$('save').disabled=!pieces.length;$('make').disabled=!(lessons.length||k);$('addl').disabled=!k;$('undo').disabled=!hist.length;$('libsave').disabled=!pieces.some(p=>p.ans);$('libuse').disabled=!pieces.length;updTot();updSteps()}
+const STEPS=[['الصفحات','s1'],['القص','s2'],['الإجابات','grid'],['الفيديو','s4']];
+function updSteps(){
+  const done=[pages.length>0||pieces.length>0,pieces.length>0,pieces.some(p=>p.ans),$('out').children.length>0];
+  const cur=done.indexOf(false),nav=$('steps');nav.innerHTML='';
+  STEPS.forEach((st,i)=>{
+    const b=document.createElement('button');b.className='stp'+(done[i]?' done':'')+(i===cur?' cur':'');
+    b.textContent=(done[i]?'✓ ':(i+1)+'. ')+st[0];
+    b.onclick=()=>$(st[1]).scrollIntoView({behavior:'smooth',block:'start'});nav.append(b);
+  });
+}
+$('undo').onclick=()=>{if(!hist.length)return;pieces=hist.pop();draw()};
 
 /* ---- رسم الإطار 16:9 ---- */
 const HW='"Playpen Sans Arabic","Aref Ruqaa",Tahoma,sans-serif';
@@ -314,20 +368,48 @@ function wrap(ctx,t,w){
   }
   return out;
 }
-function frame(ctx,W,H,c,ans,ratio=1){
+function layout(c,W,H,on){
+  const m=W*.03,zh=on?H*.58:H,wS=Math.min((W-2*m)/c.width,2.2);
+  return{m,zh,wS,sc:$('scr').checked&&c.height*wS>(zh-2*m)*1.6};
+}
+function plan(pc,W,H,d){
+  const on=!!pc.ans&&$('hand').checked,L=layout(pc.c,W,H,on);
+  const S=L.sc?Math.min(d*.5,Math.max(3,pc.c.height*L.wS/(L.zh-2*L.m)*2.5)):0;
+  return{S,R:on?Math.min(5,(d-S)*.7):0};
+}
+function frame(ctx,W,H,c,ans,ratio=1,k='',u=0){
+  const T=(k==='g'?'✓ ':k==='r'?'✗ ':'')+(ans||'');
   ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
-  const on=!!ans&&$('hand').checked,m=W*.03,zh=on?H*.58:H;
-  const s=Math.min((W-2*m)/c.width,(zh-2*m)/c.height,2.2),dw=c.width*s,dh=c.height*s;
+  const on=!!ans&&$('hand').checked,L=layout(c,W,H,on),m=L.m,zh=L.zh;
   ctx.imageSmoothingQuality='high';
-  ctx.drawImage(c,(W-dw)/2,on?m+(zh-2*m-dh)/2:(H-dh)/2,dw,dh);
+  if(L.sc){
+    const dw=c.width*L.wS,wh=zh-2*m,off=u*(c.height*L.wS-wh);
+    ctx.drawImage(c,0,off/L.wS,c.width,wh/L.wS,(W-dw)/2,m,dw,wh);
+  }else{
+    const s=Math.min((W-2*m)/c.width,(zh-2*m)/c.height,2.2),dw=c.width*s,dh=c.height*s;
+    ctx.drawImage(c,(W-dw)/2,on?m+(zh-2*m-dh)/2:(H-dh)/2,dw,dh);
+  }
   if(!on)return;
   const aw=W-2*m,ah=H-zh-m;
   ctx.strokeStyle='#c9d3ea';ctx.lineWidth=Math.max(1,W/640);ctx.beginPath();ctx.moveTo(m,zh);ctx.lineTo(W-m,zh);ctx.stroke();
-  ctx.direction='rtl';ctx.textAlign='right';ctx.textBaseline='top';ctx.fillStyle='#1b3fa0';
+  ctx.direction='rtl';ctx.textAlign='right';ctx.textBaseline='top';ctx.fillStyle=k==='g'?'#157a3d':k==='r'?'#c0261f':'#1b3fa0';
   let fs=Math.round(W*.045),lines=[];
-  for(;fs>10;fs-=2){ctx.font='600 '+fs+'px '+HW;lines=wrap(ctx,ans,aw);if(lines.length*fs*1.45<=ah)break}
-  let left=Math.ceil(ans.length*ratio),y=zh+m*.6;
-  for(const ln of lines){if(left<=0)break;ctx.fillText(ln.slice(0,left),W-m,y);left-=ln.length+1;y+=fs*1.45}
+  for(;fs>10;fs-=2){ctx.font='600 '+fs+'px '+HW;lines=wrap(ctx,T,aw);if(lines.length*fs*1.45<=ah)break}
+  const ws=lines.map(l=>ctx.measureText(l).width),tot=ws.reduce((a,b)=>a+b,0)||1;
+  let pos=ratio*tot,y=zh+m*.6,px=null,py=0;
+  for(let i=0;i<lines.length;i++){
+    const wi=ws[i]||1,f=Math.max(0,Math.min(1,pos/wi)),vis=f*wi;
+    if(f>0){ctx.save();ctx.beginPath();ctx.rect(W-m-vis,y-fs*.2,vis+2,fs*1.6);ctx.clip();ctx.fillText(lines[i],W-m,y);ctx.restore()}
+    if(f>0&&f<1){px=W-m-vis;py=y+fs*.95}
+    pos-=wi;y+=fs*1.45;if(pos<=0)break;
+  }
+  if(px!==null&&ratio<1){
+    const L=fs*1.3,dx=L*.57,dy=-L*.82;
+    ctx.save();ctx.translate(px,py);ctx.lineCap='round';
+    ctx.strokeStyle='#2d3748';ctx.lineWidth=fs*.17;ctx.beginPath();ctx.moveTo(dx*.22,dy*.22);ctx.lineTo(dx,dy);ctx.stroke();
+    ctx.strokeStyle='#e0a030';ctx.lineWidth=fs*.1;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(dx*.22,dy*.22);ctx.stroke();
+    ctx.restore();
+  }
 }
 
 /* ---- الفيديو ---- */
@@ -347,7 +429,7 @@ function loadMux(){
 async function fastMake(sel,W,H){
   if(!window.VideoEncoder)throw new Error('المتصفح لا يدعم التشفير السريع');
   await loadMux();
-  const vc={codec:'avc1.640028',width:W,height:H,bitrate:+$('br').value,framerate:2};
+  const vc={codec:'avc1.640028',width:W,height:H,bitrate:+$('br').value,framerate:10};
   if(!(await VideoEncoder.isConfigSupported(vc)).supported)throw new Error('صيغة H.264 غير مدعومة');
   let ac=null,am='';
   if(audio){
@@ -367,10 +449,10 @@ async function fastMake(sel,W,H){
   const cv=document.createElement('canvas');cv.width=W;cv.height=H;const ctx=cv.getContext('2d');
   const total=sel.reduce((a,p)=>a+dur(p),0);let t=0,n=0;
   for(let i=0;i<sel.length;i++){
-    const pc=sel[i],d=dur(pc),R=pc.ans&&$('hand').checked?Math.min(5,d*.6):0;
+    const pc=sel[i],d=dur(pc),{S,R}=plan(pc,W,H,d);
     for(let k=0;k<d;){
-      const len=Math.min(k<R?.25:1,d-k);
-      frame(ctx,W,H,pc.c,pc.ans,R?Math.min(1,(k+len)/R):1);
+      const len=Math.min(k<S+R?.1:1,d-k),e=k+len;
+      frame(ctx,W,H,pc.c,pc.ans,R?Math.min(1,Math.max(0,(e-S)/R)):1,pc.k,S?Math.min(1,e/S):0);
       const vf=new VideoFrame(cv,{timestamp:Math.round((t+k)*1e6),duration:Math.round(len*1e6)});
       ve.encode(vf,{keyFrame:k===0||n%8===0});vf.close();n++;k+=len;
       if(ve.encodeQueueSize>8)await new Promise(r=>setTimeout(r,5));
@@ -410,7 +492,7 @@ function finish(blob,ext,total,name){
     }catch(e){if(e&&e.code==='declined')return}
     const a=document.createElement('a');a.href=url;a.download=fn;document.body.append(a);a.click();a.remove();
   };
-  $('out').append(box);
+  $('out').append(box);updSteps();
 }
 async function makeOne(sel,name){
   if(!window.MediaRecorder&&!window.VideoEncoder){$('st').textContent='هذا المتصفح لا يدعم التسجيل. استخدم Chrome أو Edge.';return}
@@ -421,7 +503,7 @@ async function makeOne(sel,name){
     catch(e){$('st').textContent='تعذر التسجيل السريع ('+e.message+')، سيتم التسجيل بالوقت الحقيقي.';await new Promise(r=>setTimeout(r,1500))}
   }
   const cv=document.createElement('canvas');cv.width=W;cv.height=H;
-  const ctx=cv.getContext('2d');frame(ctx,W,H,sel[0].c,sel[0].ans,0);
+  const ctx=cv.getContext('2d');frame(ctx,W,H,sel[0].c,sel[0].ans,0,sel[0].k);
   const types=audio?['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm']:['video/mp4;codecs=avc1','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
   const mime=types.find(t=>MediaRecorder.isTypeSupported(t));
   let rec,ac,src;
@@ -436,9 +518,10 @@ async function makeOne(sel,name){
   const total=sel.reduce((a,p)=>a+dur(p),0)*1000,t0=performance.now();
   rec.start(1000);if(src)src.start();
   for(const pc of sel){
-    const st=performance.now(),end=st+dur(pc)*1000,R=pc.ans&&$('hand').checked?Math.min(5,dur(pc)*.6):0;
+    const st=performance.now(),d=dur(pc),end=st+d*1000,{S,R}=plan(pc,W,H,d);
     while(performance.now()<end){
-      frame(ctx,W,H,pc.c,pc.ans,R?Math.min(1,(performance.now()-st)/(R*1000)):1);
+      const e=(performance.now()-st)/1000;
+      frame(ctx,W,H,pc.c,pc.ans,R?Math.min(1,Math.max(0,(e-S)/R)):1,pc.k,S?Math.min(1,e/S):0);
       const done=performance.now()-t0;
       $('bar').firstChild.style.width=Math.min(100,done/total*100)+'%';
       $('st').textContent='جارٍ التسجيل... متبقٍ حوالي '+Math.max(0,Math.ceil((total-done)/1000))+' ثانية. لا تغلق هذه الصفحة.';
@@ -464,7 +547,7 @@ function drawLessons(){
 $('addl').onclick=()=>{
   const sel=pieces.filter(p=>p.keep);if(!sel.length)return;
   lessons.push({name:$('lname').value.trim()||('درس_'+(lessons.length+1)),sel,audio});
-  $('lname').value='';pieces=[];pages=[];pageCuts=[];audio=null;$('aud').value='';$('files').value='';
+  $('lname').value='';hist=[];pieces=[];pages=[];pageCuts=[];audio=null;$('aud').value='';$('files').value='';
   $('grid').innerHTML='';$('apg').innerHTML='';$('cut').disabled=true;
   $('info').textContent='أُضيف الدرس للقائمة. اختر صفحات الدرس التالي.';
   drawLessons();upd();
@@ -519,7 +602,7 @@ $('aadd').onclick=()=>{
 };
 $('adel').onclick=()=>{if(asel>=0){acuts.splice(asel,1);asel=-1;paintAdj()}};
 $('aok').onclick=()=>{
-  if(!pages.length)return;
+  if(!pages.length)return;snap();
   const im=pgc[curPg]||pages[curPg],h=dimsOf(im)[1],pts=[0,...acuts.map(Math.round),h],np=[];
   for(let i=0;i<pts.length-1;i++){const c=mkPiece(im,pts[i],pts[i+1]-pts[i]);if(c)np.push({c,keep:true,pg:curPg,label:'صفحة '+(curPg+1)+' / قطعة '+(i+1)})}
   pageCuts[curPg]=acuts.slice();
@@ -550,24 +633,71 @@ async function pdfRange(f,a,b){
     S=sm;maxImg=lm.images.maxCount;$('ai').hidden=false;
   }catch(e){}
 })();
-$('ext').onclick=async()=>{
-  const f=$('book').files[0],a=+$('p1').value||1,b=+$('p2').value||a,sel=pieces.filter(p=>p.keep),st=$('ast');
-  if(!f||!sel.length){st.textContent='اختر ملف الكتاب، وقصّ صفحات التقييم أولاً.';return}
+function parseChk(t){
+  t=(t||'').trim();
+  const m=t.match(/^\[(سليمة|مشكوك|خاطئة)\]\s*/),tag=m?m[1]:'مشكوك',rest=m?t.slice(m[0].length):t;
+  const fm=rest.match(/الصحيحة:\s*([\s\S]*)$/);
+  return{chk:tag==='سليمة'?'ok':tag==='خاطئة'?'bad':'warn',note:(fm?rest.slice(0,fm.index):rest).trim(),fix:fm?fm[1].trim():''};
+}
+async function checkOne(pc,bb){
+  const qb=await toBlob(shrink(pc.c,900));
+  const r=await S('الصور الأولى ('+bb.length+') صفحات من كتاب المدرسة، والأخيرة سؤال من التقييم. هذه إجابة مقترحة للسؤال:\n'+pc.ans+'\n\nراجعها بدقة مقابل الكتاب فقط. اكتب في السطر الأول وسماً واحداً: [سليمة] إن كانت صحيحة ومدعومة بالكتاب، أو [مشكوك] إن كانت غير مؤكدة أو ناقصة أو لا تظهر في الصفحات، أو [خاطئة] إن كانت تخالف الكتاب. ثم سطراً واحداً بسبب مختصر جداً. وإذا كانت [خاطئة] فأضف في سطر أخير: الصحيحة: ثم الإجابة الصحيحة.',{images:[...bb,qb],modelTier:'default',cache:false});
+  Object.assign(pc,parseChk(r.text));
+}
+$('chk').onclick=async()=>{
+  const sel=pieces.filter(p=>p.keep&&p.ans),st=$('ast');
+  if(!sel.length){st.textContent='لا توجد إجابات لمراجعتها. استخرجها أو اكتبها أولاً.';return}
+  $('chk').disabled=true;$('ext').disabled=true;
+  try{
+    const bb=await bookBlobs();
+    for(let i=0;i<sel.length;i++){
+      st.textContent='جارٍ مراجعة الإجابة '+(i+1)+' من '+sel.length+'...';
+      await checkOne(sel[i],bb);draw();
+    }
+    const n=k=>sel.filter(p=>p.chk===k).length;
+    st.textContent='تمت المراجعة: '+n('ok')+' سليمة، '+n('warn')+' مشكوك فيها، '+n('bad')+' خاطئة. راجع المشكوك فيها والخاطئة فقط.';
+  }catch(e){
+    st.textContent=e&&e.code==='not_granted'?'لم تتم الموافقة على استخدام Claude.':'تعذرت المراجعة: '+((e&&e.message)||e);
+  }finally{$('chk').disabled=false;$('ext').disabled=false}
+};
+
+let bookC=null;
+async function bookBlobs(){
+  const f=$('book').files[0],a=+$('p1').value||1,b=+$('p2').value||a;
+  if(!f)throw new Error('اختر ملف الكتاب أولاً');
   const nb=Math.min(b-a+1,maxImg-1);
-  if(nb<1){st.textContent='نطاق الصفحات غير صحيح.';return}
-  if(b-a+1>nb)st.textContent='سيُستخدم أول '+nb+' صفحات فقط من النطاق (حد الصور في الطلب الواحد).';
+  if(nb<1)throw new Error('نطاق الصفحات غير صحيح');
+  const key=f.name+'|'+f.size+'|'+a+'|'+nb;
+  if(bookC&&bookC.key===key)return bookC.bb;
+  $('ast').textContent='جارٍ تجهيز صفحات الكتاب...';
+  const bb=await Promise.all((await pdfRange(f,a,a+nb-1)).map(c=>toBlob(shrink(c,1100))));
+  bookC={key,bb};return bb;
+}
+function parseAns(t){
+  t=(t||'').trim();
+  const m=t.match(/^\[(صح|خطأ|اختيار|فراغ)\]\s*/);
+  if(!m)return{ans:t,k:''};
+  const tag=m[1],rest=t.slice(m[0].length).trim();
+  return{ans:rest||((tag==='صح'||tag==='خطأ')?tag:''),k:(tag==='صح'||tag==='اختيار')?'g':tag==='خطأ'?'r':''};
+}
+async function askOne(pc,bb){
+  const qb=await toBlob(shrink(pc.c,900));
+  const mode=$('amode').value==='x'?'ثم سطراً أو سطرين من الشرح المختصر جداً':'بإجابة مختصرة جداً (سطر إلى ثلاثة) بدون شرح';
+  const r=await S('الصور الأولى ('+bb.length+') هي صفحات من كتاب المدرسة (الشرح)، والصورة الأخيرة سؤال من التقييم. أجب بالعربية اعتماداً على شرح الكتاب فقط. السطر الأول وسم واحد فقط: [صح] أو [خطأ] إن كان السؤال صحاً وخطأً (حسب حكم العبارة)، أو [اختيار] إن كان اختياراً من متعدد، أو [فراغ] لأي نوع آخر. بعد الوسم اكتب الإجابة '+mode+'. في سؤال الصح والخطأ اكتب الكلمة ثم تصحيح العبارة إن كانت خاطئة. بدون مقدمة. وإذا لم تجد الإجابة في الصفحات فاكتب [فراغ] ثم: غير موجودة في الصفحات المحددة.',{images:[...bb,qb],modelTier:'default',cache:false});
+  Object.assign(pc,parseAns(r.text));
+}
+$('ext').onclick=async()=>{
+  const sel=pieces.filter(p=>p.keep),st=$('ast');
+  if(!sel.length){st.textContent='قصّ صفحات التقييم أولاً.';return}
   $('ext').disabled=true;
   try{
-    st.textContent='جارٍ تجهيز صفحات الكتاب...';
-    const bb=await Promise.all((await pdfRange(f,a,a+nb-1)).map(c=>toBlob(shrink(c,1100))));
+    const bb=await bookBlobs();
     for(let i=0;i<sel.length;i++){
       st.textContent='جارٍ استخراج إجابة السؤال '+(i+1)+' من '+sel.length+'...';
-      const qb=await toBlob(shrink(sel[i].c,900));
-      const r=await S('الصور الأولى ('+bb.length+') هي صفحات من كتاب المدرسة (الشرح)، والصورة الأخيرة سؤال من التقييم. أجب عن السؤال بالعربية اعتماداً على شرح الكتاب فقط، بإجابة مختصرة جداً (من سطر إلى ثلاثة أسطر) بدون مقدمة وبدون شرح. إذا كان السؤال اختيارياً فاكتب الإجابة الصحيحة فقط. وإذا لم تجد الإجابة في الصفحات فاكتب: غير موجودة في الصفحات المحددة.',{images:[...bb,qb],modelTier:'default',cache:false});
-      sel[i].ans=(r.text||'').trim();
-      draw();
+      if(sel[i].lib)continue;
+      await askOne(sel[i],bb);draw();
     }
-    st.textContent='تم. راجع كل إجابة وعدّلها إن لزم قبل صنع الفيديو.';
+    st.textContent='تم. راجع كل إجابة وعدّلها إن لزم، ويمكنك إعادة استخراج قطعة واحدة بزر "أعد الاستخراج".';
   }catch(e){
     st.textContent=e&&e.code==='not_granted'?'لم تتم الموافقة على استخدام Claude.':'تعذر الاستخراج: '+((e&&e.message)||e);
   }finally{$('ext').disabled=false}
@@ -605,14 +735,14 @@ function enhance(c,x,w,h){
 
 /* ---- حفظ المشاريع ---- */
 const idb=()=>new Promise((res,rej)=>{
-  const r=indexedDB.open('vt-projects',1);
-  r.onupgradeneeded=()=>r.result.createObjectStore('p',{keyPath:'name'});
+  const r=indexedDB.open('vt-projects',2);
+  r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains('p'))d.createObjectStore('p',{keyPath:'name'});if(!d.objectStoreNames.contains('q'))d.createObjectStore('q',{keyPath:'h'})};
   r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);
 });
-async function dbop(mode,fn){
+async function dbop(mode,fn,store='p'){
   const d=await idb();
   return new Promise((res,rej)=>{
-    const t=d.transaction('p',mode),rq=fn(t.objectStore('p'));
+    const t=d.transaction(store,mode),rq=fn(t.objectStore(store));
     t.oncomplete=()=>res(rq&&rq.result);t.onerror=()=>rej(t.error);
   });
 }
@@ -638,7 +768,7 @@ $('save').onclick=async()=>{
   $('save').disabled=true;$('st').textContent='جارٍ حفظ المشروع...';
   try{
     const ps=[];
-    for(const p of pieces)ps.push({blob:await pngBlob(p.c),ans:p.ans||'',d:p.d||0,keep:p.keep,label:p.label});
+    for(const p of pieces)ps.push({blob:await pngBlob(p.c),ans:p.ans||'',k:p.k||'',d:p.d||0,keep:p.keep,label:p.label});
     await dbop('readwrite',st=>st.put({name:nm,t:Date.now(),ps}));
     $('st').textContent='تم حفظ المشروع "'+nm+'". الصوت لا يُحفظ، أعد اختياره عند الفتح.';
     listProj();
@@ -652,15 +782,54 @@ async function openProj(name){
     for(const q of pr.ps){
       const bm=await createImageBitmap(q.blob),c=document.createElement('canvas');
       c.width=bm.width;c.height=bm.height;c.getContext('2d').drawImage(bm,0,0);
-      out.push({c,ans:q.ans,d:q.d,keep:q.keep,label:q.label});
+      out.push({c,ans:q.ans,k:q.k||'',d:q.d,keep:q.keep,label:q.label});
     }
-    pieces=out;pages=[];pageCuts=[];pgc=[];$('lname').value=pr.name;
+    pieces=out;hist=[];pages=[];pageCuts=[];pgc=[];$('lname').value=pr.name;
     $('apg').innerHTML='';$('cut').disabled=true;
     $('info').textContent='تم فتح المشروع "'+pr.name+'" ('+out.length+' قطعة).';
     draw();$('projd').open=false;
   }catch(e){$('st').textContent='تعذر فتح المشروع: '+((e&&e.message)||e)}
 }
 listProj();
+updSteps();
+
+/* ---- مكتبة الإجابات ---- */
+function qhash(c){
+  const mid=document.createElement('canvas');mid.width=mid.height=96;
+  const mx=mid.getContext('2d');mx.fillStyle='#fff';mx.fillRect(0,0,96,96);mx.imageSmoothingQuality='high';mx.drawImage(c,0,0,96,96);
+  const a=document.createElement('canvas');a.width=a.height=24;
+  const x=a.getContext('2d',{willReadFrequently:true});x.fillStyle='#fff';x.fillRect(0,0,24,24);x.imageSmoothingQuality='high';x.drawImage(mid,0,0,24,24);
+  const d=x.getImageData(0,0,24,24).data,g=[];let m=0;
+  for(let i=0;i<576;i++){const v=d[i*4]*.3+d[i*4+1]*.59+d[i*4+2]*.11;g.push(v);m+=v}
+  m/=576;return g.map(v=>v<m?'1':'0').join('');
+}
+const arOf=c=>Math.round(c.width/c.height*10)/10;
+function ham(a,b){let n=0;for(let i=0;i<a.length;i++)if(a[i]!==b[i])n++;return n}
+async function libAll(){try{return await dbop('readonly',st=>st.getAll(),'q')}catch(e){return[]}}
+async function libCount(){$('libn').textContent=(await libAll()).length}
+$('libsave').onclick=async()=>{
+  const sel=pieces.filter(p=>p.keep&&p.ans&&p.chk!=='bad');
+  if(!sel.length){$('st').textContent='لا توجد إجابات صالحة للحفظ.';return}
+  try{
+    for(const p of sel)await dbop('readwrite',st=>st.put({h:qhash(p.c),ar:arOf(p.c),ans:p.ans,k:p.k||'',t:Date.now()}),'q');
+    $('st').textContent='حُفظت '+sel.length+' إجابة في المكتبة.';libCount();
+  }catch(e){$('st').textContent='تعذر الحفظ في المكتبة: '+((e&&e.message)||e)}
+};
+$('libuse').onclick=async()=>{
+  const all=await libAll();
+  if(!all.length){$('st').textContent='المكتبة فارغة.';return}
+  let n=0;
+  for(const p of pieces){
+    if(p.ans)continue;
+    const h=qhash(p.c),ar=arOf(p.c);let best=null,bd=1e9;
+    for(const e of all){if(Math.abs(e.ar-ar)>.15*Math.max(ar,e.ar))continue;const dd=ham(h,e.h);if(dd<bd){bd=dd;best=e}}
+    if(best&&bd<=40){p.ans=best.ans;p.k=best.k;p.lib=true;n++}
+  }
+  $('st').textContent=n?'استُدعيت '+n+' إجابة من المكتبة. تأكد أنها لنفس الأسئلة.':'لم يُعثر على أسئلة مطابقة في المكتبة.';
+  draw();
+};
+$('libclr').onclick=async()=>{if(confirm('مسح كل إجابات المكتبة؟')){try{await dbop('readwrite',st=>st.clear(),'q')}catch(e){}libCount()}};
+libCount();
 
 if('serviceWorker' in navigator){
   addEventListener('load',()=>{
