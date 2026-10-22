@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>تنزيل المكتبات</title>
+<style>body{font:16px/1.7 system-ui,Tahoma,sans-serif;max-width:560px;margin:32px auto;padding:0 16px;background:#eef1f6;color:#1b2430}
+button{font:inherit;padding:12px 22px;border:0;border-radius:12px;background:#2b4fa3;color:#fff;cursor:pointer}button:disabled{opacity:.5}
+#log{white-space:pre-wrap;background:#fff;border-radius:10px;padding:12px;margin-top:16px;min-height:60px;direction:ltr;text-align:left;font:13px/1.6 monospace}</style></head>
+<body>
+<h1>تنزيل المكتبات والخطوط</h1>
+<p>افتح هذه الصفحة في <b>Chrome</b> أو <b>Edge</b> على الحاسوب وأنت متصل بالإنترنت. اضغط الزر واختر <b>مجلد التطبيق</b> (الذي فيه index.html)، وسأنشئ فيه المجلدين <code>lib</code> و<code>fonts</code>.</p>
+<button id="go">اختر مجلد التطبيق وابدأ</button>
+<div id="log"></div>
+<script>
+const L=document.getElementById('log'),log=t=>{L.textContent+=t+'\n'};
+const LIBS={'mp4-muxer.js':'https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.3/build/mp4-muxer.js','pdf.min.js':'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js','pdf.worker.min.js':'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'};
+const FONTS=['https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap','https://fonts.googleapis.com/css2?family=Playpen+Sans+Arabic:wght@400;600&display=swap'];
+async function save(dir,name,data){const fh=await dir.getFileHandle(name,{create:true}),w=await fh.createWritable();await w.write(data);await w.close()}
+async function get(u){const r=await fetch(u);if(!r.ok)throw new Error(r.status+' '+u);return r}
+async function sha(s){const h=new Uint8Array(await crypto.subtle.digest('SHA-1',new TextEncoder().encode(s)));return [...h].map(b=>b.toString(16).padStart(2,'0')).join('').slice(0,12)}
+document.getElementById('go').onclick=async()=>{
+  if(!window.showDirectoryPicker){log('هذا المتصفح لا يدعم اختيار المجلدات. استخدم Chrome أو Edge على الحاسوب، أو استخدم get-libs.bat.');return}
+  const b=document.getElementById('go');
+  try{
+    const root=await showDirectoryPicker({mode:'readwrite'});b.disabled=true;
+    const lib=await root.getDirectoryHandle('lib',{create:true}),fonts=await root.getDirectoryHandle('fonts',{create:true});
+    for(const [n,u] of Object.entries(LIBS)){const d=await (await get(u)).arrayBuffer();await save(lib,n,d);log('OK lib/'+n+' '+Math.round(d.byteLength/1024)+' KB')}
+    let cnt=0,all=[];
+    for(const u of FONTS){
+      let css=await (await get(u)).text();
+      for(const f of new Set(css.match(/https:\/\/fonts\.gstatic\.com[^)'"\s]+/g)||[])){
+        const n=await sha(f)+'.woff2';await save(fonts,n,await (await get(f)).arrayBuffer());css=css.split(f).join(n);cnt++;
+      }
+      all.push(css);
+    }
+    await save(fonts,'fonts.css',all.join('\n'));log('OK fonts/fonts.css + '+cnt+' font files');
+    log('\nتم. ارفع المجلدين lib و fonts مع بقية الملفات.');
+  }catch(e){log('تعذّر التنزيل: '+(e&&e.message||e));}
+  b.disabled=false;
+};
+</script></body></html>

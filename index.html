@@ -77,7 +77,7 @@ dialog#ed::backdrop{background:rgba(10,15,30,.55)}
 <body>
 <main>
 <h1>فيديو حل التقييمات</h1>
-<div class="row" style="margin-bottom:6px"><button class="alt sm" id="inst" hidden>ثبّت التطبيق</button><button class="ok sm" id="upd" hidden>يوجد تحديث جديد، اضغط لإعادة التحميل</button></div>
+<div class="row" style="margin-bottom:6px"><button class="alt sm" id="inst" hidden>ثبّت التطبيق</button><button class="ok sm" id="upd" hidden>يوجد تحديث جديد، اضغط لإعادة التحميل</button><span class="note" id="asv" role="status" aria-live="polite"></span></div>
 <nav class="steps" id="steps" aria-label="خطوات العمل"></nav>
 <p class="sub">ضع صور الصفحات، والبرنامج يقصّها ويحوّلها إلى 16:9 ثم فيديو مضغوط.</p>
 
@@ -85,7 +85,18 @@ dialog#ed::backdrop{background:rgba(10,15,30,.55)}
   <h2>١. الصفحات</h2>
   <div id="drop" tabindex="0" role="button">اضغط هنا لاختيار صور أو ملفات PDF للصفحات، أو اسحبها وأفلتها</div>
   <input type="file" id="files" accept="image/*,application/pdf" multiple hidden>
+  <label style="display:flex;flex-direction:row;align-items:center;gap:8px;margin-top:8px;color:var(--ink)"><input type="checkbox" id="lowmem"> وضع توفير الذاكرة (يصغّر الصفحات الكبيرة عند التحميل؛ مناسب للهواتف الضعيفة أو الملفات الكثيرة)</label>
   <p class="note" id="info" role="status" aria-live="polite">لم يتم اختيار صفحات بعد. تُرتَّب الصفحات حسب اسم الملف.</p>
+  <details id="tpld" style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">قوالب الإعدادات</summary>
+    <div class="row" style="margin-top:8px;align-items:end">
+      <label>القوالب المحفوظة<select id="tpls"></select></label>
+      <button class="alt" id="tplapply">طبّق القالب</button>
+      <button class="alt" id="tpldel">احذف</button>
+      <label>اسم قالب جديد<input type="text" id="tpln" placeholder="مثال: علوم صف ٦" style="font:inherit;padding:7px 10px;border:1px solid var(--line);border-radius:7px"></label>
+      <button class="alt" id="tplsave">احفظ الإعدادات الحالية</button>
+    </div>
+    <p class="note" id="tplst" role="status" aria-live="polite">يحفظ القالب: عدد القطع، حساسية الفراغ، تحسين الصفحات، مدة القطعة، الأبعاد، الضغط، خيارات الفيديو، ونوع الإجابة.</p>
+  </details>
 </section>
 
 <section id="s2" data-tab="2">
@@ -136,8 +147,32 @@ dialog#ed::backdrop{background:rgba(10,15,30,.55)}
   <p class="note" id="rbst" role="status" aria-live="polite">يقرأ Claude كل صفحة ويفهم تصميمها وألوانها، ثم يرسم قالباً يشبهها بالنص. بعدها تراجع الإجابات في قائمة القطع وتعدّلها، وتصنع الفيديو.</p>
 </section>
 
+<section id="txt" data-tab="3"><h2>استيراد الإجابات من ملف نصي (بدون Claude)</h2>
+  <div class="row">
+    <label>ملف نصي (.txt)<input type="file" id="txtf" accept=".txt,text/plain"></label>
+    <button class="alt" id="txtgo">وزّع الإجابات على القطع</button>
+    <button class="alt" id="txtexp">صدّر نموذج الإجابات</button>
+    <button id="qebtn" disabled>إدخال الإجابات قطعة قطعة</button>
+  </div>
+  <textarea id="txta" rows="4" style="width:100%;margin-top:6px;font:inherit" placeholder="أو الصق الإجابات هنا: إجابة لكل فقرة (يفصل بينها سطر فارغ) أو لكل سطر. بنفس ترتيب القطع المحددة."></textarea>
+  <p class="note" id="txtst" role="status" aria-live="polite">تُوزَّع الإجابات على القطع المضمَّنة بالترتيب الظاهر في القائمة. يُتجاهل الترقيم في أول الإجابة (1. أو ١- أو 1)). اكتب <b>-</b> وحدها لتخطي قطعة. زر "صدّر نموذج الإجابات" ينزّل ملفاً مرتباً بعدد القطع الحالية، فتملؤه ثم تستورده، وتُتجاهل الأسطر التي تبدأ بـ #.</p>
+</section>
+
 <section id="noai" data-tab="3"><h2>٣. الإجابات</h2><p class="note">أدوات الاستخراج وإعادة بناء الصفحة تعمل داخل Claude فقط. يمكنك هنا كتابة الإجابات يدوياً في خانة كل قطعة.</p></section>
-<div id="gs" data-tab="2 3"><div id="grid"></div></div>
+<div id="gs" data-tab="2 3">
+<div id="bulk" class="row" style="margin:8px 0;align-items:center" hidden>
+  <b id="bulkn">لا شيء محدد</b>
+  <button class="alt sm" id="bsall">تحديد الكل</button>
+  <button class="alt sm" id="bsnone">إلغاء التحديد</button>
+  <button class="alt sm" id="boff">استبعاد المحدد</button>
+  <button class="alt sm" id="bon">تضمين المحدد</button>
+  <input type="number" id="bdur" min="1" max="300" placeholder="ثوانٍ" aria-label="مدة المحدد بالثواني" style="width:80px">
+  <button class="alt sm" id="bdurgo">طبّق المدة</button>
+  <button class="alt sm" id="bdura">مدة تلقائية للمحدد</button>
+  <select id="bpen" aria-label="لون القلم للمحدد"><option value="">قلم أزرق</option><option value="g">أخضر ✓</option><option value="r">أحمر ✗</option></select>
+  <button class="alt sm" id="bpengo">طبّق اللون</button>
+</div>
+<div id="grid"></div></div>
 
 <section id="s4" data-tab="4">
   <h2>٤. الفيديو</h2>
@@ -151,11 +186,13 @@ dialog#ed::backdrop{background:rgba(10,15,30,.55)}
     <label>الضغط
       <select id="br"><option value="400000">قوي (أصغر حجم)</option><option value="900000" selected>متوسط</option><option value="2500000">خفيف (أعلى جودة)</option></select>
     </label>
+    <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="autod" checked> مدة تلقائية حسب طول الإجابة</label>
     <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="fast" checked> تسجيل سريع</label>
     <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="hand" checked> الإجابة بخط اليد</label>
     <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="scr" checked> تمرير الأسئلة الطويلة</label>
     <button id="make" disabled>اصنع الفيديو</button>
     <button class="alt" id="stop" hidden>إيقاف</button>
+    <button class="alt" id="prev" disabled>معاينة سريعة</button>
   </div>
   <div class="row" style="margin-top:12px">
     <label>اسم الدرس (اسم الملف)<input type="text" id="lname" placeholder="مثال: صف٦_علوم_درس٢" style="font:inherit;padding:7px 10px;border:1px solid var(--line);border-radius:7px;min-width:200px"></label>
@@ -184,6 +221,32 @@ dialog#ed::backdrop{background:rgba(10,15,30,.55)}
   <p class="note">يعمل أفضل على متصفح Chrome أو Edge. الضغط يتم أثناء إنشاء الفيديو، فلا حاجة لبرنامج ضغط خارجي. التسجيل السريع ينتج MP4 في ثوانٍ ويحتاج نت أول مرة فقط، وبدونه يرجع التطبيق للتسجيل بالوقت الحقيقي.</p>
 </section>
 </main>
+
+<dialog id="qe" aria-label="إدخال الإجابات قطعة قطعة">
+  <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px"><b id="qet">القطعة</b><button id="qex" class="alt sm">إنهاء</button></div>
+  <canvas id="qec" style="width:100%;max-width:720px;border:1px solid var(--line);display:block"></canvas>
+  <textarea id="qea" rows="3" style="width:100%;margin-top:8px;font:inherit" placeholder="اكتب إجابة هذه القطعة (Ctrl+Enter للانتقال للتالية)"></textarea>
+  <div class="row" style="margin-top:8px;align-items:center">
+    <button class="alt" id="qep">→ السابقة</button>
+    <button id="qen">التالية ←</button>
+    <select id="qek" aria-label="لون القلم"><option value="">قلم أزرق</option><option value="g">أخضر ✓</option><option value="r">أحمر ✗</option></select>
+    <span class="note" id="qes"></span>
+  </div>
+</dialog>
+
+<dialog id="pw" aria-label="تنبيهات قبل الفيديو">
+  <b>تنبيهات قبل إنشاء الفيديو</b>
+  <div id="pwl" style="margin:10px 0;max-height:55vh;overflow:auto"></div>
+  <div class="row"><button id="pwgo">أكمل رغم ذلك</button><button class="alt" id="pwfix">ارجع وحدّد القطع المشكلة</button></div>
+</dialog>
+
+<dialog id="pv" aria-label="معاينة الفيديو">
+  <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px"><b id="pvt">معاينة</b><span>
+    <select id="pvs" aria-label="سرعة المعاينة"><option value="1">سرعة عادية</option><option value="4" selected>٤ أضعاف</option><option value="10">١٠ أضعاف</option></select>
+    <button id="pvp" class="alt sm">إيقاف مؤقت</button> <button id="pvx" class="alt sm">إغلاق</button></span></div>
+  <canvas id="pvc" style="width:100%;max-width:720px;border:1px solid var(--line);display:block"></canvas>
+  <div id="pvb" style="height:6px;background:var(--line);margin-top:6px;border-radius:3px;overflow:hidden"><i style="display:block;height:100%;width:0;background:#2b4fa3"></i></div>
+</dialog>
 
 <dialog id="ed" aria-label="تعديل القالب">
   <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:10px"><b>تعديل القالب</b><span><button id="edok" class="ok sm">تطبيق</button> <button id="edx" class="alt sm">إلغاء</button></span></div>
@@ -243,7 +306,12 @@ async function load(list){
       else pages.push(await loadImg(f));
     }catch(e){bad+=' تعذر قراءة '+f.name+': '+e.message+'.'}
   }
-  $('info').textContent='تم تحميل '+pages.length+' صفحة.'+bad;
+  let lm='';
+  if($('lowmem').checked){
+    let n=0;pages=pages.map(p=>{const w=p.naturalWidth||p.width;if(w>1500){n++;return shrink(p,1500)}return p});
+    if(n)lm=' (صُغّرت '+n+' صفحة لتوفير الذاكرة)';
+  }
+  $('info').textContent='تم تحميل '+pages.length+' صفحة.'+lm+bad;
   $('cut').disabled=!pages.length;
   pieces=[];hist=[];$('grid').innerHTML='';$('make').disabled=true;updSteps();if(pages.length)showTab(2);
 }
@@ -307,7 +375,7 @@ $('cut').onclick=async()=>{
   $('cut').disabled=false;
 };
 const gs=()=>Math.max(1,+$('sec').value||6);
-const dur=p=>p.d>0?p.d:gs();
+const dur=p=>p.d>0?p.d:(($('autod')&&$('autod').checked&&p.ans)?Math.round((gs()+Math.min(30,p.ans.length*0.1))*10)/10:gs());
 let audio=null,lessons=[],pageCuts=[],pgc=[],hist=[];
 function snap(){if(pieces.length){hist.push(pieces.slice());if(hist.length>30)hist.shift()}}
 function updTot(){
@@ -359,13 +427,13 @@ function draw(){
     const s=document.createElement('small');s.textContent=pc.label+(!pc.c._full&&layout(pc.c,1280,720,!!pc.ans&&$('hand').checked).sc?' • تمرير تلقائي':'');
     const t=document.createElement('div');t.className='tb';
     const mk=(txt,tip,fn,dis)=>{const b=document.createElement('button');b.className='alt sm';b.textContent=txt;b.title=tip;b.setAttribute('aria-label',tip);b.disabled=!!dis;b.onclick=fn;return b};
-    const inp=document.createElement('input');inp.type='number';inp.min=1;inp.max=300;inp.placeholder=gs();inp.value=pc.d||'';inp.title='مدة هذه القطعة بالثواني';inp.setAttribute('aria-label','مدة هذه القطعة بالثواني');
+    const inp=document.createElement('input');inp.type='number';inp.min=1;inp.max=300;inp.placeholder=dur({ans:pc.ans});inp.value=pc.d||'';inp.title='مدة هذه القطعة بالثواني';inp.setAttribute('aria-label','مدة هذه القطعة بالثواني');
     inp.oninput=()=>{pc.d=+inp.value||0;updTot()};
     t.append(mk('→','قدّم القطعة',()=>mv(i,-1),i==0),mk('←','أخّر القطعة',()=>mv(i,1),i==pieces.length-1),
       mk('✂','قسّم القطعة نصفين',()=>split(i)),mk('دمج','ادمج مع التالية',()=>merge(i),i==pieces.length-1),inp);
     const ta=document.createElement('textarea');ta.rows=2;ta.placeholder='الإجابة (اكتبها أو عدّلها)';ta.setAttribute('aria-label','الإجابة: '+pc.label);ta.value=pc.ans||'';
     ta.style.cssText='width:100%;margin-top:6px;font:inherit;font-size:.85rem;border:1px solid var(--line);border-radius:6px;padding:4px;background:transparent;color:inherit';
-    ta.oninput=()=>{pc.ans=ta.value;pc.chk='';pc.lib=false};ta.onchange=()=>frame(v.getContext('2d'),320,180,pc.c,pc.ans,1,pc.k);
+    ta.oninput=()=>{pc.ans=ta.value;pc.chk='';pc.lib=false;updTot()};ta.onchange=()=>frame(v.getContext('2d'),320,180,pc.c,pc.ans,1,pc.k);
     const cr=document.createElement('div');cr.className='tb';
     const sl=document.createElement('select');sl.style.minWidth='0';sl.title='لون القلم';sl.setAttribute('aria-label','لون القلم');
     [['','قلم أزرق'],['g','أخضر ✓'],['r','أحمر ✗']].forEach(o=>sl.add(new Option(o[1],o[0])));
@@ -377,7 +445,10 @@ function draw(){
       catch(e){$('ast').textContent='تعذر الاستخراج: '+((e&&e.message)||e);rb.disabled=false}
     });cr.append(rb)}
     if(pc.rb)cr.append(mk('تعديل القالب','عدّل نصوص وألوان الصفحة وقارنها بالأصل',()=>openEd(pc.rb.sp)));
-    d.append(v,s,t,ta,cr);
+    const sw=document.createElement('label');sw.className='note';sw.style.cssText='display:flex;gap:6px;align-items:center;margin:4px 0';
+    const sc=document.createElement('input');sc.type='checkbox';sc.checked=!!pc.sel;sc.setAttribute('aria-label','تحديد '+pc.label);sc.onchange=()=>{pc.sel=sc.checked;bulkInfo()};
+    sw.append(sc,document.createTextNode('تحديد'));
+    d.append(sw,v,s,t,ta,cr);
     if(pc.lib&&!pc.chk){const lb=document.createElement('div');lb.className='chk warn';lb.textContent='↺ من المكتبة: تأكد أنها نفس السؤال';d.append(lb)}
     if(pc.chk){
       const b=document.createElement('div');b.className='chk '+pc.chk;
@@ -386,7 +457,7 @@ function draw(){
     }
     g.append(d);
   });
-  upd();
+  upd();bulkInfo();
 }
 function upd(){pieces.forEach(p=>{if(p.c._full)p.c._full.sp.acts[p.c._full.i].skip=!p.keep});const k=pieces.some(p=>p.keep);$('save').disabled=!pieces.length;$('make').disabled=!(lessons.length||k);$('addl').disabled=!k;$('undo').disabled=!hist.length;$('libsave').disabled=!pieces.some(p=>p.ans);$('libuse').disabled=!pieces.length;updTot();updSteps()}
 const STEPS=[['الصفحات','📄'],['القص','✂️'],['الإجابات','✍️'],['الفيديو','🎬']];
@@ -552,15 +623,17 @@ async function fastMake(sel,W,H){
 let outUrls=[],outFiles=[];
 async function rmOpfs(n){try{const d=await navigator.storage.getDirectory();await d.removeEntry(n)}catch(e){}}
 async function cleanOpfs(){try{const d=await navigator.storage.getDirectory();for await(const [n] of d.entries())if(/^vt-.*\.mp4$/.test(n))await d.removeEntry(n).catch(()=>{})}catch(e){}}
-function freeOut(){outUrls.forEach(u=>URL.revokeObjectURL(u));outUrls=[];outFiles.forEach(rmOpfs);outFiles=[]}
+function freeOut(){pendingDl=0;outUrls.forEach(u=>URL.revokeObjectURL(u));outUrls=[];outFiles.forEach(rmOpfs);outFiles=[]}
 cleanOpfs();
+let pendingDl=0;
 function finish(blob,ext,total,name,opfs){
   if(opfs)outFiles.push(opfs);
   const url=URL.createObjectURL(blob),box=document.createElement('div');outUrls.push(url);
   box.innerHTML='<p><b></b> — '+(blob.size/1048576).toFixed(2)+' ميجابايت، حوالي '+Math.round(total/1000)+' ثانية</p><video controls></video><p><button class="ok">تنزيل الفيديو</button></p>'+
     (ext==='webm'?'<p class="note">الصيغة WebM لأن التسجيل السريع لم يعمل.</p>':'');
-  box.querySelector('b').textContent=name;box.querySelector('video').src=url;
+  box.querySelector('b').textContent=name;box.querySelector('video').src=url;pendingDl++;let got=false;
   box.querySelector('button').onclick=async()=>{
+    if(!got){got=true;pendingDl--}
     const fn=name+'.'+ext;
     try{
       const d=window.claude&&await window.claude.use('downloads');
@@ -647,7 +720,7 @@ async function runAll(){
   }catch(e){if(e===CANCEL)$('st').textContent='تم إيقاف إنشاء الفيديو.';else throw e}
   finally{audio=keep;cancel=false;$('stop').hidden=true;unlockScreen();$('cut').disabled=!pages.length;upd()}
 }
-$('make').onclick=runAll;
+$('make').onclick=()=>preCheck(runAll);
 $('stop').onclick=()=>{cancel=true;$('st').textContent='جارٍ الإيقاف...'};
 
 /* ---- ضبط القص يدوياً ---- */
@@ -896,7 +969,8 @@ async function autoSave(){
     const ps=await serPieces();
     await dbop('readwrite',st=>st.put({name:AUTO,lname:$('lname').value,t:Date.now(),ps}));
     autoSig=sg;
-  }catch(e){}finally{autoBusy=false}
+    $('asv').textContent='✓ حُفظ تلقائياً '+new Date().toLocaleTimeString('ar',{hour:'2-digit',minute:'2-digit'});
+  }catch(e){$('asv').textContent='⚠ تعذر الحفظ التلقائي (التخزين ممتلئ أو غير متاح)'}finally{autoBusy=false}
 }
 setInterval(autoSave,5000);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')autoSave()});
@@ -1158,6 +1232,181 @@ addEventListener('beforeinstallprompt',e=>{e.preventDefault();dip=e;$('inst').hi
 $('inst').onclick=async()=>{if(!dip)return;dip.prompt();try{await dip.userChoice}catch(e){}dip=null;$('inst').hidden=true};
 addEventListener('appinstalled',()=>{$('inst').hidden=true});
 $('upd').onclick=()=>location.reload();
+
+/* ---- استيراد الإجابات من ملف نصي ---- */
+(()=>{
+  const st=$('txtst');
+  function parse(t){
+    t=t.replace(/\r\n?/g,'\n').replace(/^\uFEFF/,'').trim();if(!t)return[];
+    const bm=/\n\s*\n/.test(t);
+    const blocks=(bm?t.split(/\n\s*\n/):t.split('\n').filter(l=>!/^\s*#/.test(l))).map(b=>bm?b.split('\n').filter(l=>!/^\s*#/.test(l)).join('\n'):b);
+    return blocks.map(b=>b.trim().replace(/^[\(\[]?[0-9\u0660-\u0669]+[\)\]\.\-\u2013:\u060C]\s+/,'').trim());
+  }
+  function load(f){return new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(String(r.result));r.onerror=no;r.readAsText(f,'utf-8')})}
+  $('txtf').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{$('txta').value=await load(f);st.textContent='تم تحميل الملف: '+f.name+'. اضغط "وزّع الإجابات على القطع".'}catch(_){st.textContent='تعذرت قراءة الملف.'}};
+  $('txtgo').onclick=()=>{
+    const sel=pieces.filter(p=>p.keep);
+    if(!sel.length){st.textContent='لا توجد قطع بعد. حمّل الصفحات وقصّها أولاً.';return}
+    const ans=parse($('txta').value);
+    if(!ans.length){st.textContent='لا توجد إجابات. اختر ملفاً أو الصق النص.';return}
+    let n=0;
+    sel.forEach((p,i)=>{if(i<ans.length&&ans[i]&&ans[i]!=='-'){p.ans=ans[i];p.chk='';p.lib=false;n++}});
+    draw();
+    const d=ans.length-sel.length;
+    st.textContent='وُزّعت '+n+' إجابة على '+sel.length+' قطعة.'+(d>0?' تنبيه: في الملف '+d+' إجابة زائدة لم تُستخدم.':d<0?' تنبيه: '+(-d)+' قطعة بقيت بلا إجابة.':'')+' راجع كل إجابة وعدّلها قبل الفيديو.';
+  };
+})();
+
+/* ---- نموذج الإجابات والمعاينة ---- */
+(()=>{
+  $('txtexp').onclick=()=>{
+    const sel=pieces.filter(p=>p.keep);
+    if(!sel.length){$('txtst').textContent='لا توجد قطع بعد. حمّل الصفحات وقصّها أولاً.';return}
+    const txt=sel.map((p,i)=>{
+      const h=(i==0?'# اكتب إجابة كل قطعة تحت سطرها. افصل بين القطع بسطر فارغ. اكتب - لتخطي قطعة. الأسطر التي تبدأ بـ # تُتجاهل.\n':'')+'# القطعة '+(i+1)+' من '+sel.length+': '+p.label;
+      return h+'\n'+(p.ans||'');
+    }).join('\n\n')+'\n';
+    const b=new Blob(['\uFEFF'+txt],{type:'text/plain;charset=utf-8'}),u=URL.createObjectURL(b),a=document.createElement('a');
+    a.href=u;a.download=(($('lname').value.trim()||'نموذج_الإجابات'))+'.txt';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);
+    $('txtst').textContent='نُزّل النموذج بعدد '+sel.length+' قطعة. املأه ثم اختره من "ملف نصي".';
+  };
+  const dlg=$('pv'),cv=$('pvc');let run=0,paused=false,pos=0;
+  const sync=()=>{$('prev').disabled=!pieces.some(p=>p.keep)};
+  setInterval(sync,700);
+  $('pvp').onclick=()=>{paused=!paused;$('pvp').textContent=paused?'متابعة':'إيقاف مؤقت'};
+  $('pvx').onclick=()=>{run++;dlg.close()};
+  dlg.addEventListener('close',()=>{run++});
+  $('prev').onclick=async()=>{
+    const sel=pieces.filter(p=>p.keep);if(!sel.length)return;
+    await fontsReady();sel.forEach(p=>{if(p.c._full)p.c._full.L=null});
+    const W=960,H=540;cv.width=W;cv.height=H;const ctx=cv.getContext('2d');
+    const total=sel.reduce((a,p)=>a+dur(p),0);
+    paused=false;$('pvp').textContent='إيقاف مؤقت';const my=++run;
+    if(!dlg.open)dlg.showModal();
+    for(let i=0;i<sel.length;i++){
+      const pc=sel[i],d=dur(pc),{S,R}=plan(pc,W,H,d);let e=0,last=performance.now();
+      const before=sel.slice(0,i).reduce((a,p)=>a+dur(p),0);
+      while(e<d){
+        if(my!==run)return;
+        const now=performance.now(),dt=(now-last)/1000;last=now;
+        if(!paused)e+=dt*(+$('pvs').value);
+        frame(ctx,W,H,pc.c,pc.ans,R?Math.min(1,Math.max(0,(e-S)/R)):1,pc.k,S?Math.min(1,e/S):0);
+        $('pvb').firstChild.style.width=Math.min(100,(before+Math.min(e,d))/total*100)+'%';
+        $('pvt').textContent='معاينة: القطعة '+(i+1)+' من '+sel.length+' ('+pc.label+')'+(pc.ans?'':' — بلا إجابة');
+        await new Promise(r=>setTimeout(r,50));
+      }
+    }
+    if(my===run)$('pvt').textContent='انتهت المعاينة ('+Math.round(total)+' ثانية بالسرعة العادية)';
+  };
+})();
+
+/* ---- قوالب الإعدادات + التحديد المتعدد + الإدخال السريع ---- */
+function bulkInfo(){
+  const n=pieces.filter(p=>p.sel).length;
+  $('bulk').hidden=!pieces.length;$('bulkn').textContent=n?('محدد: '+n+' من '+pieces.length):'لا شيء محدد';
+  $('qebtn').disabled=!pieces.some(p=>p.keep);
+}
+(()=>{
+  const sel=()=>pieces.filter(p=>p.sel);
+  const need=()=>{if(!sel().length){$('bulkn').textContent='حدّد قطعة واحدة على الأقل أولاً';return false}return true};
+  $('bsall').onclick=()=>{pieces.forEach(p=>p.sel=true);draw()};
+  $('bsnone').onclick=()=>{pieces.forEach(p=>p.sel=false);draw()};
+  $('boff').onclick=()=>{if(!need())return;sel().forEach(p=>p.keep=false);draw()};
+  $('bon').onclick=()=>{if(!need())return;sel().forEach(p=>p.keep=true);draw()};
+  $('bdurgo').onclick=()=>{if(!need())return;const v=+$('bdur').value;if(!(v>0)){$('bulkn').textContent='اكتب عدد الثواني';return}sel().forEach(p=>p.d=v);draw()};
+  $('bdura').onclick=()=>{if(!need())return;sel().forEach(p=>p.d=0);draw()};
+  $('bpengo').onclick=()=>{if(!need())return;const k=$('bpen').value;sel().forEach(p=>p.k=k);draw()};
+
+  /* القوالب */
+  const KEY='vt-templates',IDS=['parts','sens','enh','sec','res','br','fast','hand','scr','autod','amode','lowmem'];
+  const rd=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'{}')||{}}catch(_){return{}}};
+  const wr=o=>{try{localStorage.setItem(KEY,JSON.stringify(o));return true}catch(_){return false}};
+  const el=id=>$(id),st=m=>{$('tplst').textContent=m};
+  function list(){const o=rd(),sl=$('tpls');sl.innerHTML='';Object.keys(o).forEach(k=>sl.add(new Option(k,k)));if(!sl.options.length)sl.add(new Option('— لا توجد قوالب —',''))}
+  $('tplsave').onclick=()=>{
+    const n=$('tpln').value.trim();if(!n){st('اكتب اسماً للقالب أولاً.');return}
+    const v={};IDS.forEach(i=>{const e=el(i);if(e)v[i]=e.type==='checkbox'?e.checked:e.value});
+    const o=rd();o[n]=v;if(!wr(o)){st('التخزين غير متاح في هذا المتصفح.');return}
+    list();$('tpls').value=n;st('حُفظ القالب "'+n+'".');
+  };
+  $('tplapply').onclick=()=>{
+    const n=$('tpls').value,v=rd()[n];if(!v){st('اختر قالباً.');return}
+    IDS.forEach(i=>{const e=el(i);if(!e||!(i in v))return;if(e.type==='checkbox')e.checked=!!v[i];else e.value=v[i]});
+    try{updTot()}catch(_){}draw();st('طُبّق القالب "'+n+'". إن كانت الصفحات مقصوصة فأعد القص ليسري عدد القطع والحساسية.');
+  };
+  $('tpldel').onclick=()=>{const n=$('tpls').value;if(!n)return;if(!confirm('حذف القالب "'+n+'"؟'))return;const o=rd();delete o[n];wr(o);list();st('حُذف القالب.')};
+  list();
+  ['autod','sec'].forEach(i=>{$(i).addEventListener('change',()=>{draw()})});
+
+  /* الإدخال السريع */
+  const dlg=$('qe'),cv=$('qec');let list_=[],ix=0;
+  const ctx=()=>cv.getContext('2d');
+  function show(){
+    const pc=list_[ix];cv.width=960;cv.height=540;
+    frame(ctx(),960,540,pc.c,pc.ans,1,pc.k);
+    $('qea').value=pc.ans||'';$('qek').value=pc.k||'';
+    $('qet').textContent='القطعة '+(ix+1)+' من '+list_.length+' ('+pc.label+')';
+    $('qep').disabled=ix==0;$('qen').textContent=ix==list_.length-1?'إنهاء ✓':'التالية ←';
+    $('qes').textContent=list_.filter(p=>p.ans).length+' من '+list_.length+' لها إجابة';
+    $('qea').focus();
+  }
+  function keepCur(){const pc=list_[ix];pc.ans=$('qea').value;pc.k=$('qek').value;pc.chk='';pc.lib=false}
+  function go(d){
+    keepCur();const j=ix+d;
+    if(j>=list_.length){dlg.close();return}
+    if(j<0)return;ix=j;show();
+  }
+  $('qebtn').onclick=async()=>{
+    list_=pieces.filter(p=>p.keep);if(!list_.length)return;
+    await fontsReady();list_.forEach(p=>{if(p.c._full)p.c._full.L=null});
+    ix=Math.max(0,list_.findIndex(p=>!p.ans));dlg.showModal();show();
+  };
+  $('qen').onclick=()=>go(1);$('qep').onclick=()=>go(-1);
+  $('qex').onclick=()=>{keepCur();dlg.close()};
+  $('qea').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();go(1)}});
+  $('qea').addEventListener('input',()=>{const pc=list_[ix];pc.ans=$('qea').value;frame(ctx(),960,540,pc.c,pc.ans,1,$('qek').value)});
+  $('qek').onchange=()=>{const pc=list_[ix];pc.k=$('qek').value;frame(ctx(),960,540,pc.c,pc.ans,1,pc.k)};
+  dlg.addEventListener('close',()=>{draw()});
+})();
+
+/* ---- تحذير قبل الفيديو ---- */
+function preCheck(go){
+  const jobs=lessons.length?lessons:[{name:$('lname').value.trim()||'فيديو_الحل',sel:pieces.filter(p=>p.keep),audio}];
+  const out=[],bad=new Set(),hasAns=p=>!!(p.ans||(p.c._full&&p.c._full.sp.acts[p.c._full.i].a));
+  const fmt=t=>t>=60?Math.floor(t/60)+' د '+Math.round(t%60)+' ث':Math.round(t)+' ث';
+  jobs.forEach(j=>{
+    const pre=jobs.length>1?'['+j.name+'] ':'';
+    if(!j.sel.length){out.push(['err',pre+'لا توجد قطع مضمّنة.']);return}
+    const no=j.sel.filter(p=>!hasAns(p));
+    if(no.length){no.forEach(p=>bad.add(p));out.push(['warn',pre+no.length+' قطعة بلا إجابة: '+no.slice(0,5).map(p=>p.label).join('، ')+(no.length>5?' ...':'')])}
+    const lg=j.sel.filter(p=>dur(p)>60),sh=j.sel.filter(p=>dur(p)<2);
+    if(lg.length){lg.forEach(p=>bad.add(p));out.push(['warn',pre+lg.length+' قطعة مدتها أكثر من دقيقة: '+lg.slice(0,4).map(p=>p.label+' ('+fmt(dur(p))+')').join('، ')])}
+    if(sh.length){sh.forEach(p=>bad.add(p));out.push(['warn',pre+sh.length+' قطعة مدتها أقل من ثانيتين: '+sh.slice(0,4).map(p=>p.label).join('، ')])}
+    const tot=j.sel.reduce((a,p)=>a+dur(p),0);
+    if(tot>900)out.push(['warn',pre+'مدة الفيديو '+fmt(tot)+'، وهي طويلة وقد يكبر الملف ويطول التسجيل.']);
+    if(j.audio){const d=j.audio.duration;if(Math.abs(d-tot)>Math.max(5,d*0.15))out.push(['warn',pre+'مدة الصوت ('+fmt(d)+') تختلف عن مدة الفيديو ('+fmt(tot)+'). استخدم "وزّع المدة على طول الصوت".'])}
+    const dup=j.sel.filter((p,i)=>p.ans&&j.sel.findIndex(q=>q.ans===p.ans)!==i);
+    if(dup.length)out.push(['warn',pre+dup.length+' قطعة لها نفس إجابة قطعة سابقة تماماً (ربما تكرار): '+dup.slice(0,4).map(p=>p.label).join('، ')]);
+    const doubt=j.sel.filter(p=>(p.chk&&p.chk!=='ok'));
+    if(doubt.length){doubt.forEach(p=>bad.add(p));out.push(['warn',pre+doubt.length+' إجابة معلّمة خاطئة أو مشكوك فيها بعد المراجعة: '+doubt.slice(0,4).map(p=>p.label).join('، ')])}
+  });
+  if(!out.length){go();return}
+  const box=$('pwl');box.innerHTML='';
+  out.forEach(([k,t])=>{const d=document.createElement('div');d.className='chk '+(k==='err'?'bad':'warn');d.style.margin='4px 0';d.textContent=(k==='err'?'✗ ':'⚠ ')+t;box.append(d)});
+  const blocked=out.some(o=>o[0]==='err');
+  $('pwgo').disabled=blocked;
+  $('pwgo').onclick=()=>{$('pw').close();go()};
+  $('pwfix').onclick=()=>{pieces.forEach(p=>p.sel=bad.has(p));$('pw').close();draw();showTab(3)};
+  $('pwfix').disabled=!bad.size&&!blocked?true:false;
+  $('pw').showModal();
+}
+
+/* ---- أمان: تنبيه الإغلاق + توفير الذاكرة ---- */
+addEventListener('beforeunload',e=>{
+  const rec=!$('stop').hidden,unsaved=pieces.length&&(autoBusy||sigOf()!==autoSig);
+  if(rec||pendingDl>0||unsaved){e.preventDefault();e.returnValue='';return ''}
+});
+try{if(navigator.deviceMemory&&navigator.deviceMemory<=2){$('lowmem').checked=true}}catch(_){}
 </script>
 </body>
 </html>
