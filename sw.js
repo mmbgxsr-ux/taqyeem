@@ -1,12 +1,25 @@
-const V='vt-v14';
-const SHELL=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png'];
+const V='vt-v16';
+const SHELL=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png','./icon-192-maskable.png','./icon-512-maskable.png'];
+const LOCAL=['./lib/mp4-muxer.js','./lib/pdf.min.js','./lib/pdf.worker.min.js','./fonts/fonts.css'];
 const EXT=['https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.3/build/mp4-muxer.js','https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js','https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'];
 const FONTS=['https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap','https://fonts.googleapis.com/css2?family=Playpen+Sans+Arabic:wght@400;600&display=swap'];
 const HOSTS=['cdn.jsdelivr.net','cdnjs.cloudflare.com','fonts.googleapis.com','fonts.gstatic.com'];
 self.addEventListener('install',e=>{
   e.waitUntil((async()=>{
     const c=await caches.open(V);
-    for(const u of SHELL){try{await c.put(u,await fetch(new Request(u,{cache:'reload'})))}catch(_){}}
+    for(const u of SHELL){try{const r=await fetch(new Request(u,{cache:'reload'}));if(r.ok)await c.put(u,r)}catch(_){}}
+    for(const u of LOCAL){
+      try{
+        const r=await fetch(new Request(u,{cache:'reload'}));
+        if(!r.ok||/html/.test(r.headers.get('content-type')||''))continue;
+        if(u.endsWith('.css')){
+          const css=await r.clone().text();await c.put(u,r);
+          for(const f of new Set([...css.matchAll(/url\(['"]?([^)'"]+)['"]?\)/g)].map(m=>m[1]))){
+            try{const fu=new URL(f,new URL(u,location.href)).href;const fr=await fetch(fu);if(fr.ok)await c.put(fu,fr)}catch(_){}
+          }
+        }else await c.put(u,r);
+      }catch(_){}
+    }
     for(const u of EXT){try{const r=await fetch(u,{mode:'cors'});if(r.ok)await c.put(u,r)}catch(_){}}
     for(const u of FONTS){
       try{
