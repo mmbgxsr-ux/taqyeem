@@ -52,6 +52,22 @@ section,#grid{scroll-margin-top:70px}
 .chk.ok{background:#e1f3e8;color:#14673a}.chk.warn{background:#fff1d6;color:#8a5200}.chk.bad{background:#fde3e1;color:#a3221b}
 @media (prefers-color-scheme:dark){.chk.ok{background:#173a2a;color:#9fe0b9}.chk.warn{background:#3d2f10;color:#f2c879}.chk.bad{background:#40201d;color:#f4a8a2}}
 .note{color:var(--mut);font-size:.88rem;margin:8px 0 0}
+
+/* ---- واجهة بتبويبات سفلية ---- */
+[data-tab]{display:none}[data-tab].on{display:block}section[hidden]{display:none!important}
+main{padding-bottom:110px}
+h1{font-size:1.6rem;font-weight:700}
+section{border:0;border-radius:18px;padding:20px;box-shadow:0 1px 2px rgba(20,30,60,.06),0 8px 24px rgba(20,30,60,.06)}
+h2{font-size:1.15rem;font-weight:700;margin-bottom:14px}
+button,.btn{border-radius:12px}select,input[type=number],input[type=text],textarea{border-radius:10px}
+#drop{border-radius:16px;padding:36px 18px;background:color-mix(in srgb,var(--acc) 7%,transparent)}
+.th{border-radius:14px}
+.steps{position:fixed;inset:auto 0 0 0;top:auto;z-index:20;margin:0;gap:4px;justify-content:center;overflow:visible;background:color-mix(in srgb,var(--card) 94%,transparent);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:6px 10px calc(6px + env(safe-area-inset-bottom,0px))}
+.stp{flex:1;max-width:200px;min-width:0;display:flex;flex-direction:column;align-items:center;gap:1px;background:transparent;border:0;border-radius:14px;color:var(--mut);font-size:.74rem;padding:6px 2px}
+.stp .ic{font-size:1.35rem;line-height:1.2}
+.stp.cur{background:color-mix(in srgb,var(--acc) 14%,transparent);color:var(--acc)}
+.stp.done:not(.cur){color:var(--ok);border:0}
+@media (min-width:700px){.steps{padding-inline:calc(50% - 300px)}}
 </style>
 </head>
 <body>
@@ -61,14 +77,14 @@ section,#grid{scroll-margin-top:70px}
 <nav class="steps" id="steps" aria-label="خطوات العمل"></nav>
 <p class="sub">ضع صور الصفحات، والبرنامج يقصّها ويحوّلها إلى 16:9 ثم فيديو مضغوط.</p>
 
-<section id="s1">
+<section id="s1" data-tab="1">
   <h2>١. الصفحات</h2>
   <div id="drop" tabindex="0" role="button">اضغط هنا لاختيار صور أو ملفات PDF للصفحات، أو اسحبها وأفلتها</div>
   <input type="file" id="files" accept="image/*,application/pdf" multiple hidden>
   <p class="note" id="info" role="status" aria-live="polite">لم يتم اختيار صفحات بعد. تُرتَّب الصفحات حسب اسم الملف.</p>
 </section>
 
-<section id="s2">
+<section id="s2" data-tab="2">
   <h2>٢. القص</h2>
   <div class="row">
     <label>عدد القطع في كل صفحة
@@ -82,7 +98,6 @@ section,#grid{scroll-margin-top:70px}
     <button class="alt" id="undo" disabled>↩ تراجع</button>
   </div>
   <p class="note">يبحث البرنامج عن أقرب فراغ بين الأسئلة ليقص عنده، ثم يقص الهوامش البيضاء. اضغط على صورة أي قطعة لاستبعادها. تحت كل قطعة أزرار للترتيب (→ ←) والتقسيم (✂) والدمج مع التالية، وخانة لمدتها الخاصة بالثواني.</p>
-  <div id="grid"></div>
   <details id="adj" style="margin-top:12px"><summary style="cursor:pointer;font-weight:600">ضبط خطوط القص يدوياً</summary>
     <div class="row" style="margin-top:8px">
       <label>الصفحة<select id="apg"></select></label>
@@ -95,7 +110,7 @@ section,#grid{scroll-margin-top:70px}
   </details>
 </section>
 
-<section id="ai" hidden>
+<section id="ai" data-tab="3" hidden>
   <h2>٣. الإجابات من الكتاب (اختياري)</h2>
   <div class="row">
     <label>ملف الكتاب (PDF ممسوح ضوئياً)<input type="file" id="book" accept="application/pdf"></label>
@@ -108,7 +123,7 @@ section,#grid{scroll-margin-top:70px}
   <p class="note" id="ast" role="status" aria-live="polite">اختر صفحات الدرس فقط من الكتاب (عدد محدود). يقرأ Claude الصفحات ويكتب إجابة كل قطعة، وراجعها وعدّلها قبل الفيديو.</p>
 </section>
 
-<section id="rb" hidden>
+<section id="rb" data-tab="3" hidden>
   <h2>إعادة بناء الصفحة بقالبها (اختياري)</h2>
   <div class="row">
     <label>طريقة العرض<select id="rbm"><option value="full">الصفحة كاملة (الإجابات تظهر نشاطاً بعد نشاط)</option><option value="step">كل نشاط وحده (السؤال وتحته الإجابة)</option></select></label>
@@ -117,7 +132,10 @@ section,#grid{scroll-margin-top:70px}
   <p class="note" id="rbst" role="status" aria-live="polite">يقرأ Claude كل صفحة ويفهم تصميمها وألوانها، ثم يرسم قالباً يشبهها بالنص. بعدها تراجع الإجابات في قائمة القطع وتعدّلها، وتصنع الفيديو.</p>
 </section>
 
-<section id="s4">
+<section id="noai" data-tab="3"><h2>٣. الإجابات</h2><p class="note">أدوات الاستخراج وإعادة بناء الصفحة تعمل داخل Claude فقط. يمكنك هنا كتابة الإجابات يدوياً في خانة كل قطعة.</p></section>
+<div id="gs" data-tab="2 3"><div id="grid"></div></div>
+
+<section id="s4" data-tab="4">
   <h2>٤. الفيديو</h2>
   <div class="row">
     <label>مدة كل قطعة (ثانية)
@@ -165,7 +183,7 @@ section,#grid{scroll-margin-top:70px}
 
 <script>
 const $=id=>document.getElementById(id);
-let pages=[],pieces=[];
+let pages=[],pieces=[],TAB=1;
 
 const drop=$('drop'),fi=$('files');
 drop.onclick=()=>fi.click();
@@ -214,7 +232,7 @@ async function load(list){
   }
   $('info').textContent='تم تحميل '+pages.length+' صفحة.'+bad;
   $('cut').disabled=!pages.length;
-  pieces=[];hist=[];$('grid').innerHTML='';$('make').disabled=true;updSteps();
+  pieces=[];hist=[];$('grid').innerHTML='';$('make').disabled=true;updSteps();if(pages.length)showTab(2);
 }
 
 /* ---- القص ---- */
@@ -356,15 +374,18 @@ function draw(){
   });
   upd();
 }
-function upd(){const k=pieces.some(p=>p.keep);$('save').disabled=!pieces.length;$('make').disabled=!(lessons.length||k);$('addl').disabled=!k;$('undo').disabled=!hist.length;$('libsave').disabled=!pieces.some(p=>p.ans);$('libuse').disabled=!pieces.length;updTot();updSteps()}
-const STEPS=[['الصفحات','s1'],['القص','s2'],['الإجابات','grid'],['الفيديو','s4']];
+function upd(){pieces.forEach(p=>{if(p.c._full)p.c._full.sp.acts[p.c._full.i].skip=!p.keep});const k=pieces.some(p=>p.keep);$('save').disabled=!pieces.length;$('make').disabled=!(lessons.length||k);$('addl').disabled=!k;$('undo').disabled=!hist.length;$('libsave').disabled=!pieces.some(p=>p.ans);$('libuse').disabled=!pieces.length;updTot();updSteps()}
+const STEPS=[['الصفحات','📄'],['القص','✂️'],['الإجابات','✍️'],['الفيديو','🎬']];
+function showTab(n){
+  TAB=n;document.querySelectorAll('[data-tab]').forEach(e=>e.classList.toggle('on',e.dataset.tab.split(' ').includes(''+n)));
+  scrollTo(0,0);updSteps();
+}
 function updSteps(){
-  const done=[pages.length>0||pieces.length>0,pieces.length>0,pieces.some(p=>p.ans),$('out').children.length>0];
-  const cur=done.indexOf(false),nav=$('steps');nav.innerHTML='';
+  const done=[pages.length>0||pieces.length>0,pieces.length>0,pieces.some(p=>p.ans),$('out').children.length>0],nav=$('steps');nav.innerHTML='';
   STEPS.forEach((st,i)=>{
-    const b=document.createElement('button');b.className='stp'+(done[i]?' done':'')+(i===cur?' cur':'');
-    b.textContent=(done[i]?'✓ ':(i+1)+'. ')+st[0];
-    b.onclick=()=>$(st[1]).scrollIntoView({behavior:'smooth',block:'start'});nav.append(b);
+    const b=document.createElement('button');b.className='stp'+(done[i]?' done':'')+(i+1===TAB?' cur':'');
+    b.innerHTML='<span class="ic"></span><span></span>';b.firstChild.textContent=st[1];b.lastChild.textContent=(done[i]?'✓ ':'')+st[0];
+    if(i+1===TAB)b.setAttribute('aria-current','page');b.onclick=()=>showTab(i+1);nav.append(b);
   });
 }
 $('undo').onclick=()=>{if(!hist.length)return;pieces=hist.pop();draw()};
@@ -657,7 +678,7 @@ async function pdfRange(f,a,b){
   try{
     const sm=window.claude&&await window.claude.use('sample');if(!sm)return;
     const lm=await sm.limits();if(!lm.images)return;
-    S=sm;maxImg=lm.images.maxCount;$('ai').hidden=false;$('rb').hidden=false;
+    S=sm;maxImg=lm.images.maxCount;$('ai').hidden=false;$('rb').hidden=false;$('noai').hidden=true;
   }catch(e){}
 })();
 function parseChk(t){
@@ -818,7 +839,7 @@ async function openProj(name){
   }catch(e){$('st').textContent='تعذر فتح المشروع: '+((e&&e.message)||e)}
 }
 listProj();
-updSteps();
+showTab(1);
 
 /* ---- مكتبة الإجابات ---- */
 function qhash(c){
@@ -863,6 +884,7 @@ libCount();
 const RF='Cairo,Tahoma,sans-serif',PM=40,PR=960;
 const rr=(x,a,b,w,h,r)=>{x.beginPath();x.roundRect(a,b,w,h,r)};
 const wrapT=(t,f,w)=>{const x=wrapT.x||(wrapT.x=document.createElement('canvas').getContext('2d'));x.font=f;x.direction='rtl';return wrap(x,t||'',w)};
+function wrapF(t,f,w1,w2){const x=wrapT.x||(wrapT('',f,9),wrapT.x);x.font=f;x.direction='rtl';const o=[];let c='',w=w1;for(const d of (t||'').split(/\s+/)){const y=c?c+' '+d:d;if(x.measureText(y).width>w&&c){o.push(c);c=d;w=w2}else c=y}o.push(c);return o}
 function lay(sp){
   const F='600 26px '+RF,items=[],acts=[];let y=PM;
   for(const b of sp.blocks){
@@ -870,9 +892,11 @@ function lay(sp){
     if(b.t==='text'){it.L=wrapT(b.text,F,920);it.h=it.L.length*40+12}
     if(b.t==='activity'){
       it.idx=acts.length;acts.push(it);
-      it.qL=wrapT((b.title?b.title+' '+(b.num||'')+' : ':'')+(b.q||''),F,850);
+      const mx=wrapT.x||(wrapT('',F,9),wrapT.x);mx.font='700 26px '+RF;
+      it.tw=mx.measureText(b.title||'نشاط').width;it.hw=it.tw+10+36+22;
+      it.qL=wrapF(b.q||'',F,920-it.hw,920);it.pL=b.pre?wrapT(b.pre,F,920):[];
       it.aL=b.a?wrapT((b.k==='g'?'✓ ':b.k==='r'?'✗ ':'')+b.a,F,920):[];
-      it.h=it.qL.length*40+(b.alabel&&b.a?36:0)+it.aL.length*42+30;
+      it.h=it.qL.length*40+it.pL.length*40+(b.alabel&&b.a?36:0)+it.aL.length*42+30;
     }
     items.push(it);y+=it.h+10;
   }
@@ -883,17 +907,22 @@ function drawPage(x,L,sp,off,rev){
   x.save();x.translate(0,-off);x.direction='rtl';x.textAlign='right';x.textBaseline='middle';
   for(const it of L.items){
     const b=it.b,y=it.y,h=it.h;if(y+h<off||y>off+2400)continue;
-    if(b.t==='header'){rr(x,PM,y,920,h,16);x.fillStyle=A;x.fill();x.fillStyle='#fff';x.font='700 30px '+RF;x.fillText(b.right||'',PR-20,y+h/2);x.textAlign='left';x.fillText(b.left||'',PM+20,y+h/2);x.textAlign='right'}
+    if(b.t==='header'&&b.o){x.font='700 30px '+RF;const wr=x.measureText(b.right||'').width+70,wl=x.measureText(b.left||'').width+70;x.strokeStyle='#111';x.lineWidth=4;rr(x,PR-wr,y,wr,h,h/2);x.stroke();rr(x,PM,y,wl,h,h/2);x.stroke();x.beginPath();x.moveTo(PM+wl,y+h/2);x.lineTo(PR-wr,y+h/2);x.stroke();x.fillStyle='#111';x.textAlign='center';x.fillText(b.right||'',PR-wr/2,y+h/2);x.fillText(b.left||'',PM+wl/2,y+h/2);x.textAlign='right'}
+    else if(b.t==='header'){rr(x,PM,y,920,h,16);x.fillStyle=A;x.fill();x.fillStyle='#fff';x.font='700 30px '+RF;x.fillText(b.right||'',PR-20,y+h/2);x.textAlign='left';x.fillText(b.left||'',PM+20,y+h/2);x.textAlign='right'}
     else if(b.t==='meta'){const n=(b.items||[]).length;x.fillStyle='#4b5563';x.font='600 22px '+RF;(b.items||[]).forEach((t,i)=>{x.textAlign=i==0?'right':i==n-1?'left':'center';x.fillText(t,i==0?PR:i==n-1?PM:500,y+h/2)});x.textAlign='right'}
-    else if(b.t==='banner'){rr(x,PM,y,920,h,h/2);x.fillStyle='#e5e7eb';x.fill();x.fillStyle='#111';x.font='700 26px '+RF;x.fillText(b.text||'',PR-24,y+h/2)}
+    else if(b.t==='banner'){rr(x,PM,y,920,h,h/2);x.fillStyle=b.dark?'#4b5060':'#e5e7eb';x.fill();x.fillStyle=b.dark?'#fff':'#111';x.font='700 26px '+RF;x.fillText(b.text||'',PR-24,y+h/2)}
     else if(b.t==='section'){x.font='700 26px '+RF;const w=x.measureText(b.text||'').width+60;rr(x,PR-w,y,w,h,h/2);x.strokeStyle=A;x.lineWidth=3;x.stroke();x.fillStyle='#111';x.fillText(b.text||'',PR-30,y+h/2)}
     else if(b.t==='divider'){x.strokeStyle='#9ca3af';x.lineWidth=2;x.setLineDash([3,7]);x.beginPath();x.moveTo(PM,y+12);x.lineTo(PR,y+12);x.stroke();x.setLineDash([])}
-    else if(b.t==='footer'){x.strokeStyle=A;x.lineWidth=2;x.beginPath();x.moveTo(PM,y+10);x.lineTo(PR,y+10);x.stroke();x.fillStyle='#111';x.font='600 22px '+RF;x.fillText(b.left||'',PR,y+32);x.textAlign='left';x.fillText(b.num||'',PM,y+32);x.textAlign='right'}
+    else if(b.t==='footer'){x.strokeStyle=A;x.lineWidth=2;x.beginPath();x.moveTo(PM,y+10);x.lineTo(PR,y+10);x.stroke();x.fillStyle='#111';x.font='600 22px '+RF;x.fillText(b.left||'',PR,y+32);x.strokeStyle='#111';x.lineWidth=3;rr(x,PM,y+10,70,34,17);x.stroke();x.textAlign='center';x.fillText(b.num||'',PM+35,y+28);x.textAlign='right'}
     else if(b.t==='text'){x.fillStyle='#111';x.font=F;it.L.forEach((l,i)=>x.fillText(l,PR,y+20+i*40))}
     else if(b.t==='activity'){
-      x.fillStyle=A;x.beginPath();x.arc(PR-22,y+22,22,0,7);x.fill();x.fillStyle='#fff';x.font='700 24px '+RF;x.textAlign='center';x.fillText(b.num||'•',PR-22,y+22);x.textAlign='right';
-      x.fillStyle='#111';x.font=F;it.qL.forEach((l,i)=>x.fillText(l,PR-60,y+22+i*40));
+      x.fillStyle='#111';x.font='700 26px '+RF;x.fillText(b.title||'نشاط',PR,y+22);
+      const cx=PR-it.tw-28;x.beginPath();x.arc(cx,y+22,18,0,7);x.fillStyle=A;x.fill();x.fillStyle='#fff';x.font='700 22px '+RF;x.textAlign='center';x.fillText(b.num||'•',cx,y+22);x.textAlign='right';
+      x.fillStyle='#111';x.font=F;x.fillText(':',cx-26,y+22);
+      it.qL.forEach((l,i)=>x.fillText(l,i?PR:PR-it.hw,y+22+i*40));
       let yy=y+it.qL.length*40+4;
+      x.fillStyle=AN;it.pL.forEach((l,i)=>x.fillText(l,PR,yy+18+i*40));yy+=it.pL.length*40;
+      x.fillStyle='#111';
       if(b.alabel&&b.a){x.fillText('الإجابة:',PR,yy+14);yy+=36}
       x.fillStyle=b.k==='r'?'#c0261f':b.k==='g'?'#157a3d':AN;
       const ws=it.aL.map(l=>x.measureText(l).width);let pos=rev(it.idx)*ws.reduce((a,v)=>a+v,0);
@@ -909,14 +938,14 @@ function frameFull(ctx,W,H,f,ans,ratio,k){
   const L=f.L,s=W/1000*.96,v=H/s,it=L.acts[f.i];
   ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
   ctx.save();ctx.translate((W-1000*s)/2,0);ctx.scale(s,s);
-  drawPage(ctx,L,f.sp,Math.max(0,Math.min(L.H-v,it.y+it.h/2-v/2)),j=>j<f.i?1:j===f.i?ratio:0);
+  drawPage(ctx,L,f.sp,Math.max(0,Math.min(L.H-v,it.y+it.h/2-v/2)),j=>j<f.i?(f.sp.acts[j].skip?0:1):j===f.i?ratio:0);
   ctx.restore();
 }
 function card(sp,b,sec){
   const s2={colors:sp.colors,blocks:[...(sec?[sec]:[]),{...b,a:'',alabel:false}]},L=lay(s2),c=document.createElement('canvas');
   c.width=1000;c.height=Math.ceil(L.H);const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,1000,c.height);drawPage(x,L,s2,0,()=>0);return c;
 }
-const RBP='هذه صفحة من كتاب مدرسي (أو تقييم). افهم تصميمها وأعد وصفها بـ JSON فقط بلا أي نص آخر ولا علامات ```: {"subject":"المادة","colors":{"accent":"لون الترويسة والإطارات #hex","answer":"لون الإجابات المكتوبة #hex"},"blocks":[...]}. أنواع العناصر بترتيبها في الصفحة من الأعلى: {"t":"header","right":"اسم المادة","left":"عنوان الأداة"}، {"t":"meta","items":["نصوص الشريط الصغير من اليمين لليسار"]}، {"t":"banner","text":"شريط عنوان الفترة"}، {"t":"section","text":"عنوان قسم داخل شكل بيضاوي"}، {"t":"activity","title":"نشاط","num":"١","q":"نص السؤال أو التعليمة كاملاً كما في الصفحة","a":"نص الإجابة المكتوبة (يشمل كل ما كُتب بلون الإجابة، والأسطر تفصلها \\n) أو \\"\\" إن لم توجد","alabel":true إن كانت كلمة \\"الإجابة:\\" مكتوبة}، {"t":"text","text":"فقرة عادية"}، {"t":"divider"}، {"t":"footer","left":"نص التذييل","num":"رقم الصفحة"}. انسخ النص العربي بدقة كما هو بالتشكيل والترقيم.';
+const RBP='هذه صفحة من كتاب مدرسي (أو تقييم). افهم تصميمها وأعد وصفها بـ JSON فقط بلا أي نص آخر ولا علامات ```: {"subject":"المادة","colors":{"accent":"لون الترويسة والإطارات #hex","answer":"لون الإجابات المكتوبة #hex"},"blocks":[...]}. أنواع العناصر بترتيبها في الصفحة من الأعلى: {"t":"header","right":"النص في أقصى يمين الترويسة","left":"النص في أقصى يسارها","o":true إن كانت الترويسة إطارات بخط فقط بلا تعبئة}، {"t":"meta","items":["نصوص الشريط الصغير من اليمين لليسار"]}، {"t":"banner","text":"شريط عنوان الفترة","dark":true إن كان الشريط داكناً}، {"t":"section","text":"عنوان قسم داخل شكل بيضاوي"}، {"t":"activity","title":"نشاط","num":"١","pre":"نص بلون الإجابة يسبق كلمة الإجابة إن وجد وإلا احذف الحقل","q":"نص السؤال أو التعليمة كاملاً كما في الصفحة","a":"نص الإجابة المكتوبة (يشمل كل ما كُتب بلون الإجابة، والأسطر تفصلها \\n) أو \\"\\" إن لم توجد","alabel":true إن كانت كلمة \\"الإجابة:\\" مكتوبة}، {"t":"text","text":"فقرة عادية"}، {"t":"divider"}، {"t":"footer","left":"نص التذييل","num":"رقم الصفحة"}. انسخ النص العربي بدقة كما هو بالتشكيل والترقيم.';
 $('rbgo').onclick=async()=>{
   const st=$('rbst');if(!pages.length){st.textContent='اختر صفحات أولاً.';return}
   $('rbgo').disabled=true;snap();pieces=[];$('grid').innerHTML='';
@@ -947,7 +976,7 @@ addEventListener('beforeunload',e=>{if(pieces.length||lessons.length){e.preventD
 if('serviceWorker' in navigator){
   addEventListener('load',()=>{
     const had=!!navigator.serviceWorker.controller;
-    navigator.serviceWorker.register('sw.js').catch(e=>console.warn('SW:',e));
+    fetch('sw.js',{method:'HEAD'}).then(r=>{if(r.ok)return navigator.serviceWorker.register('sw.js')}).catch(()=>{});
     navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had)$('upd').hidden=false});
     loadMux().catch(()=>{});
     loadPdf().catch(()=>{});
