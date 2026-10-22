@@ -64,6 +64,7 @@ video{width:100%;max-height:60vh;background:#000;border-radius:8px;margin-top:10
     <label>حساسية الفراغ
       <select id="sens"><option value="0.004">عادية</option><option value="0.012">عالية (نص كثيف)</option><option value="0.001">دقيقة (صفحة نظيفة)</option></select>
     </label>
+    <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="enh" checked> تحسين الصفحات الممسوحة (الميل والوضوح)</label>
     <button id="cut" disabled>قصّ الصفحات</button>
   </div>
   <p class="note">يبحث البرنامج عن أقرب فراغ بين الأسئلة ليقص عنده، ثم يقص الهوامش البيضاء. اضغط على صورة أي قطعة لاستبعادها. تحت كل قطعة أزرار للترتيب (→ ←) والتقسيم (✂) والدمج مع التالية، وخانة لمدتها الخاصة بالثواني.</p>
@@ -110,8 +111,10 @@ video{width:100%;max-height:60vh;background:#000;border-radius:8px;margin-top:10
   <div class="row" style="margin-top:12px">
     <label>اسم الدرس (اسم الملف)<input type="text" id="lname" placeholder="مثال: صف٦_علوم_درس٢" style="font:inherit;padding:7px 10px;border:1px solid var(--line);border-radius:7px;min-width:200px"></label>
     <button class="alt" id="addl" disabled>إضافة الدرس للقائمة</button>
+    <button class="alt" id="save" disabled>حفظ المشروع</button>
   </div>
   <div id="lessons"></div>
+  <details id="projd" style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">المشاريع المحفوظة</summary><div id="proj" style="margin-top:8px"></div></details>
   <p class="note">لعمل عدة فيديوهات دفعة واحدة: جهّز درساً، اضغط "إضافة الدرس للقائمة"، ثم اختر صفحات الدرس التالي. بعدها يصنع الزر كل الفيديوهات، وكل واحد بملف منفصل.</p>
   <div class="row" style="margin-top:12px">
     <label>ملف الصوت (اختياري)<input type="file" id="aud" accept="audio/*"></label>
@@ -209,7 +212,7 @@ function bbox(ctx,w,h,thr){
 }
 $('cut').onclick=async()=>{
   const n=Math.max(1,Math.min(12,+$('parts').value||1)),thr=+$('sens').value;
-  $('cut').disabled=true;pieces=[];pageCuts=[];$('grid').innerHTML='';
+  $('cut').disabled=true;pieces=[];pageCuts=[];pgc=[];$('grid').innerHTML='';
   for(let p=0;p<pages.length;p++){
     $('info').textContent='جارٍ قص الصفحة '+(p+1)+' من '+pages.length+'...';
     await new Promise(r=>setTimeout(r));
@@ -217,6 +220,8 @@ $('cut').onclick=async()=>{
     const c=document.createElement('canvas');c.width=w;c.height=h;
     const x=c.getContext('2d',{willReadFrequently:true});
     x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(im,0,0);
+    if($('enh').checked)enhance(c,x,w,h);
+    pgc[p]=c;
     const pts=splitPoints(inkRows(x,w,h,thr),h,n);pageCuts[p]=pts.slice(1,-1);
     for(let i=0;i<n;i++){
       const y0=pts[i],ph=pts[i+1]-y0;if(ph<10)continue;
@@ -237,7 +242,7 @@ $('cut').onclick=async()=>{
 };
 const gs=()=>Math.max(1,+$('sec').value||6);
 const dur=p=>p.d>0?p.d:gs();
-let audio=null,lessons=[],pageCuts=[];
+let audio=null,lessons=[],pageCuts=[],pgc=[];
 function updTot(){
   const sel=pieces.filter(p=>p.keep),t=sel.reduce((a,p)=>a+dur(p),0);
   $('tot').textContent=sel.length?'مدة الفيديو: '+Math.round(t)+' ثانية'+(audio?'، ومدة الصوت: '+Math.round(audio.duration)+' ثانية':''):'';
@@ -296,7 +301,7 @@ function draw(){
   });
   upd();
 }
-function upd(){const k=pieces.some(p=>p.keep);$('make').disabled=!(lessons.length||k);$('addl').disabled=!k;updTot()}
+function upd(){const k=pieces.some(p=>p.keep);$('save').disabled=!pieces.length;$('make').disabled=!(lessons.length||k);$('addl').disabled=!k;updTot()}
 
 /* ---- رسم الإطار 16:9 ---- */
 const HW='"Playpen Sans Arabic","Aref Ruqaa",Tahoma,sans-serif';
@@ -491,7 +496,7 @@ function loadAdj(p){
 }
 function paintAdj(){
   const x=acv.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,acv.width,acv.height);
-  x.drawImage(pages[curPg],0,0,acv.width,acv.height);
+  x.drawImage(pgc[curPg]||pages[curPg],0,0,acv.width,acv.height);
   acuts.forEach((y,i)=>{x.strokeStyle=i===asel?'#f08a00':'#e02020';x.lineWidth=i===asel?4:2;x.beginPath();x.moveTo(0,y*ak);x.lineTo(acv.width,y*ak);x.stroke()});
 }
 const ay=e=>{const r=acv.getBoundingClientRect();return (e.clientY-r.top)*acv.height/r.height/ak};
@@ -515,7 +520,7 @@ $('aadd').onclick=()=>{
 $('adel').onclick=()=>{if(asel>=0){acuts.splice(asel,1);asel=-1;paintAdj()}};
 $('aok').onclick=()=>{
   if(!pages.length)return;
-  const im=pages[curPg],h=dimsOf(im)[1],pts=[0,...acuts.map(Math.round),h],np=[];
+  const im=pgc[curPg]||pages[curPg],h=dimsOf(im)[1],pts=[0,...acuts.map(Math.round),h],np=[];
   for(let i=0;i<pts.length-1;i++){const c=mkPiece(im,pts[i],pts[i+1]-pts[i]);if(c)np.push({c,keep:true,pg:curPg,label:'صفحة '+(curPg+1)+' / قطعة '+(i+1)})}
   pageCuts[curPg]=acuts.slice();
   const at=Math.max(0,pieces.findIndex(p=>p.pg===curPg));
@@ -567,6 +572,95 @@ $('ext').onclick=async()=>{
     st.textContent=e&&e.code==='not_granted'?'لم تتم الموافقة على استخدام Claude.':'تعذر الاستخراج: '+((e&&e.message)||e);
   }finally{$('ext').disabled=false}
 };
+/* ---- تحسين الصفحات الممسوحة ---- */
+function enhance(c,x,w,h){
+  const im=x.getImageData(0,0,w,h),d=im.data,hist=new Uint32Array(256);
+  for(let i=0;i<d.length;i+=4)hist[(d[i]*.3+d[i+1]*.59+d[i+2]*.11)|0]++;
+  const tot=w*h;let acc=0,lo=0,hi=255,gotLo=false;
+  for(let v=0;v<256;v++){acc+=hist[v];if(!gotLo&&acc>=tot*.01){lo=v;gotLo=true}if(acc>=tot*.8){hi=v;break}}
+  if(hi-lo>=50){
+    const k=255/(hi-lo);
+    for(let i=0;i<d.length;i+=4){
+      d[i]=Math.max(0,Math.min(255,(d[i]-lo)*k));d[i+1]=Math.max(0,Math.min(255,(d[i+1]-lo)*k));d[i+2]=Math.max(0,Math.min(255,(d[i+2]-lo)*k));
+    }
+    x.putImageData(im,0,0);
+  }
+  const f=Math.min(1,400/w),sw=Math.round(w*f),sh=Math.round(h*f);
+  const t=document.createElement('canvas');t.width=sw;t.height=sh;const tx=t.getContext('2d',{willReadFrequently:true});
+  const score=a=>{
+    tx.fillStyle='#fff';tx.fillRect(0,0,sw,sh);tx.save();tx.translate(sw/2,sh/2);tx.rotate(a*Math.PI/180);tx.drawImage(c,-sw/2,-sh/2,sw,sh);tx.restore();
+    const g=tx.getImageData(0,0,sw,sh).data,rows=new Float64Array(sh);let m=0,q=0;
+    for(let y=0;y<sh;y++){let n=0;for(let i=0;i<sw;i++){const o=(y*sw+i)*4;if(g[o]*.3+g[o+1]*.59+g[o+2]*.11<130)n++}rows[y]=n;m+=n}
+    m/=sh;for(let y=0;y<sh;y++)q+=(rows[y]-m)*(rows[y]-m);return q;
+  };
+  let best=0,bs=score(0);
+  for(let a=-4;a<=4;a+=.5){const v=score(a);if(v>bs){bs=v;best=a}}
+  const c0=best;for(let a=c0-.4;a<=c0+.41;a+=.1){const v=score(a);if(v>bs){bs=v;best=a}}
+  if(Math.abs(best)>=.2){
+    const o=document.createElement('canvas');o.width=w;o.height=h;const ox=o.getContext('2d');
+    ox.fillStyle='#fff';ox.fillRect(0,0,w,h);ox.translate(w/2,h/2);ox.rotate(best*Math.PI/180);ox.drawImage(c,-w/2,-h/2);
+    x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(o,0,0);
+  }
+}
+
+/* ---- حفظ المشاريع ---- */
+const idb=()=>new Promise((res,rej)=>{
+  const r=indexedDB.open('vt-projects',1);
+  r.onupgradeneeded=()=>r.result.createObjectStore('p',{keyPath:'name'});
+  r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);
+});
+async function dbop(mode,fn){
+  const d=await idb();
+  return new Promise((res,rej)=>{
+    const t=d.transaction('p',mode),rq=fn(t.objectStore('p'));
+    t.oncomplete=()=>res(rq&&rq.result);t.onerror=()=>rej(t.error);
+  });
+}
+const pngBlob=c=>new Promise(r=>c.toBlob(r,'image/png'));
+async function listProj(){
+  const box=$('proj');box.innerHTML='';
+  let all=[];
+  try{all=await dbop('readonly',st=>st.getAll())}catch(e){box.textContent='التخزين غير متاح في هذا المتصفح.';return}
+  if(!all.length){box.textContent='لا توجد مشاريع محفوظة بعد.';return}
+  all.sort((a,b)=>b.t-a.t).forEach(pr=>{
+    const d=document.createElement('div');d.className='note';
+    d.textContent=pr.name+' ('+pr.ps.length+' قطعة، '+new Date(pr.t).toLocaleDateString('ar')+') ';
+    const o=document.createElement('button');o.className='alt sm';o.textContent='فتح';o.onclick=()=>openProj(pr.name);
+    const x=document.createElement('button');x.className='alt sm';x.textContent='حذف';
+    x.onclick=async()=>{if(confirm('حذف المشروع "'+pr.name+'"؟')){await dbop('readwrite',st=>st.delete(pr.name));listProj()}};
+    d.append(o,' ',x);box.append(d);
+  });
+}
+$('save').onclick=async()=>{
+  const nm=$('lname').value.trim();
+  if(!nm){$('st').textContent='اكتب اسم الدرس أولاً ليُحفظ به المشروع.';return}
+  if(!pieces.length)return;
+  $('save').disabled=true;$('st').textContent='جارٍ حفظ المشروع...';
+  try{
+    const ps=[];
+    for(const p of pieces)ps.push({blob:await pngBlob(p.c),ans:p.ans||'',d:p.d||0,keep:p.keep,label:p.label});
+    await dbop('readwrite',st=>st.put({name:nm,t:Date.now(),ps}));
+    $('st').textContent='تم حفظ المشروع "'+nm+'". الصوت لا يُحفظ، أعد اختياره عند الفتح.';
+    listProj();
+  }catch(e){$('st').textContent='تعذر الحفظ: '+((e&&e.message)||e)}
+  finally{upd()}
+};
+async function openProj(name){
+  try{
+    const pr=await dbop('readonly',st=>st.get(name));if(!pr)return;
+    const out=[];
+    for(const q of pr.ps){
+      const bm=await createImageBitmap(q.blob),c=document.createElement('canvas');
+      c.width=bm.width;c.height=bm.height;c.getContext('2d').drawImage(bm,0,0);
+      out.push({c,ans:q.ans,d:q.d,keep:q.keep,label:q.label});
+    }
+    pieces=out;pages=[];pageCuts=[];pgc=[];$('lname').value=pr.name;
+    $('apg').innerHTML='';$('cut').disabled=true;
+    $('info').textContent='تم فتح المشروع "'+pr.name+'" ('+out.length+' قطعة).';
+    draw();$('projd').open=false;
+  }catch(e){$('st').textContent='تعذر فتح المشروع: '+((e&&e.message)||e)}
+}
+listProj();
 
 if('serviceWorker' in navigator){
   addEventListener('load',()=>{
