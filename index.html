@@ -598,10 +598,13 @@ $('addl').onclick=()=>{
   $('info').textContent='أُضيف الدرس للقائمة. اختر صفحات الدرس التالي.';
   drawLessons();upd();
 };
+async function fontsReady(){
+  try{await Promise.all(['400 26px Cairo','600 26px Cairo','700 26px Cairo','600 40px "Playpen Sans Arabic"'].map(f=>document.fonts.load(f,'ابج')))}catch(e){}
+}
 async function runAll(){
   const jobs=lessons.length?lessons:[{name:$('lname').value.trim()||'فيديو_الحل',sel:pieces.filter(p=>p.keep),audio}];
   const keep=audio;
-  try{await document.fonts.load('600 40px "Playpen Sans Arabic"','ابج')}catch(e){}
+  await fontsReady();jobs.forEach(j=>j.sel.forEach(p=>{if(p.c._full)p.c._full.L=null}));
   freeOut();cancel=false;$('make').disabled=true;$('cut').disabled=true;$('addl').disabled=true;$('out').innerHTML='';$('stop').hidden=false;await lockScreen();
   try{
     for(let i=0;i<jobs.length;i++){
@@ -816,7 +819,7 @@ $('save').onclick=async()=>{
   $('save').disabled=true;$('st').textContent='جارٍ حفظ المشروع...';
   try{
     const ps=[];
-    for(const p of pieces)ps.push({blob:await pngBlob(p.c),ans:p.ans||'',k:p.k||'',d:p.d||0,keep:p.keep,label:p.label});
+    for(const p of pieces)ps.push({blob:await pngBlob(p.c),ans:p.ans||'',k:p.k||'',d:p.d||0,keep:p.keep,label:p.label,full:p.c._full?{sp:p.c._full.sp,i:p.c._full.i}:null});
     await dbop('readwrite',st=>st.put({name:nm,t:Date.now(),ps}));
     $('st').textContent='تم حفظ المشروع "'+nm+'". الصوت لا يُحفظ، أعد اختياره عند الفتح.';
     listProj();
@@ -830,6 +833,7 @@ async function openProj(name){
     for(const q of pr.ps){
       const bm=await createImageBitmap(q.blob),c=document.createElement('canvas');
       c.width=bm.width;c.height=bm.height;c.getContext('2d').drawImage(bm,0,0);
+      if(q.full&&q.full.sp&&q.full.sp.acts)c._full={sp:q.full.sp,i:q.full.i,L:null};
       out.push({c,ans:q.ans,k:q.k||'',d:q.d,keep:q.keep,label:q.label});
     }
     pieces=out;hist=[];pages=[];pageCuts=[];pgc=[];$('lname').value=pr.name;
@@ -902,6 +906,13 @@ function lay(sp){
   }
   return{items,acts,H:y+PM};
 }
+function penDraw(x,px,py,fs){
+  const L=fs*1.3,dx=L*.57,dy=-L*.82;
+  x.save();x.translate(px,py);x.lineCap='round';
+  x.strokeStyle='#2d3748';x.lineWidth=fs*.17;x.beginPath();x.moveTo(dx*.22,dy*.22);x.lineTo(dx,dy);x.stroke();
+  x.strokeStyle='#e0a030';x.lineWidth=fs*.1;x.beginPath();x.moveTo(0,0);x.lineTo(dx*.22,dy*.22);x.stroke();
+  x.restore();
+}
 function drawPage(x,L,sp,off,rev){
   const c=sp.colors||{},A=c.accent||'#2b4fa3',AN=c.answer||'#1d3fbf',F='600 26px '+RF;
   x.save();x.translate(0,-off);x.direction='rtl';x.textAlign='right';x.textBaseline='middle';
@@ -925,8 +936,8 @@ function drawPage(x,L,sp,off,rev){
       x.fillStyle='#111';
       if(b.alabel&&b.a){x.fillText('الإجابة:',PR,yy+14);yy+=36}
       x.fillStyle=b.k==='r'?'#c0261f':b.k==='g'?'#157a3d':AN;
-      const ws=it.aL.map(l=>x.measureText(l).width);let pos=rev(it.idx)*ws.reduce((a,v)=>a+v,0);
-      it.aL.forEach((l,i)=>{const w=ws[i]||1,v=Math.max(0,Math.min(w,pos));if(v>0){x.save();x.beginPath();x.rect(PR-v,yy-4,v+2,44);x.clip();x.fillText(l,PR,yy+16);x.restore()}pos-=w;yy+=42});
+      const ws=it.aL.map(l=>x.measureText(l).width),rv=rev(it.idx);let pos=rv*ws.reduce((a,v)=>a+v,0);
+      it.aL.forEach((l,i)=>{const w=ws[i]||1,v=Math.max(0,Math.min(w,pos));if(v>0){x.save();x.beginPath();x.rect(PR-v,yy-4,v+2,44);x.clip();x.fillText(l,PR,yy+16);x.restore()}if(v>0&&v<w&&rv<1)penDraw(x,PR-v,yy+30,26);pos-=w;yy+=42});
     }
   }
   x.restore();
@@ -938,7 +949,10 @@ function frameFull(ctx,W,H,f,ans,ratio,k){
   const L=f.L,s=W/1000*.96,v=H/s,it=L.acts[f.i];
   ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
   ctx.save();ctx.translate((W-1000*s)/2,0);ctx.scale(s,s);
-  drawPage(ctx,L,f.sp,Math.max(0,Math.min(L.H-v,it.y+it.h/2-v/2)),j=>j<f.i?(f.sp.acts[j].skip?0:1):j===f.i?ratio:0);
+  const on=$('hand').checked;
+  let off=it.y+it.h/2-v/2;
+  if($('scr').checked&&it.h+40>v)off=it.y-20+(it.h+40-v)*(on?ratio:0);
+  drawPage(ctx,L,f.sp,Math.max(0,Math.min(L.H-v,off)),j=>!on?0:j<f.i?(f.sp.acts[j].skip?0:1):j===f.i?ratio:0);
   ctx.restore();
 }
 function card(sp,b,sec){
@@ -948,26 +962,34 @@ function card(sp,b,sec){
 const RBP='هذه صفحة من كتاب مدرسي (أو تقييم). افهم تصميمها وأعد وصفها بـ JSON فقط بلا أي نص آخر ولا علامات ```: {"subject":"المادة","colors":{"accent":"لون الترويسة والإطارات #hex","answer":"لون الإجابات المكتوبة #hex"},"blocks":[...]}. أنواع العناصر بترتيبها في الصفحة من الأعلى: {"t":"header","right":"النص في أقصى يمين الترويسة","left":"النص في أقصى يسارها","o":true إن كانت الترويسة إطارات بخط فقط بلا تعبئة}، {"t":"meta","items":["نصوص الشريط الصغير من اليمين لليسار"]}، {"t":"banner","text":"شريط عنوان الفترة","dark":true إن كان الشريط داكناً}، {"t":"section","text":"عنوان قسم داخل شكل بيضاوي"}، {"t":"activity","title":"نشاط","num":"١","pre":"نص بلون الإجابة يسبق كلمة الإجابة إن وجد وإلا احذف الحقل","q":"نص السؤال أو التعليمة كاملاً كما في الصفحة","a":"نص الإجابة المكتوبة (يشمل كل ما كُتب بلون الإجابة، والأسطر تفصلها \\n) أو \\"\\" إن لم توجد","alabel":true إن كانت كلمة \\"الإجابة:\\" مكتوبة}، {"t":"text","text":"فقرة عادية"}، {"t":"divider"}، {"t":"footer","left":"نص التذييل","num":"رقم الصفحة"}. انسخ النص العربي بدقة كما هو بالتشكيل والترقيم.';
 $('rbgo').onclick=async()=>{
   const st=$('rbst');if(!pages.length){st.textContent='اختر صفحات أولاً.';return}
-  $('rbgo').disabled=true;snap();pieces=[];$('grid').innerHTML='';
+  $('rbgo').disabled=true;await fontsReady();const old=pieces,np=[],fails=[];
   try{
     for(let p=0;p<pages.length;p++){
       st.textContent='جارٍ تحليل الصفحة '+(p+1)+' من '+pages.length+'...';
       const im=pages[p],cv=document.createElement('canvas');cv.width=im.naturalWidth||im.width;cv.height=im.naturalHeight||im.height;
       const x=cv.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,cv.width,cv.height);x.drawImage(im,0,0);
-      const r=await S(RBP,{images:[await toBlob(shrink(cv,1500))],modelTier:'default',cache:false});
-      const m=(r.text||'').match(/\{[\s\S]*\}/);if(!m)throw new Error('لم يرجع وصف صالح للصفحة '+(p+1));
-      const sp=JSON.parse(m[0]);sp.blocks=(sp.blocks||[]).filter(b=>b&&b.t);
-      sp.acts=sp.blocks.filter(b=>b.t==='activity');
+      let sp=null;
+      for(let t=0;t<3&&!sp;t++){
+        try{
+          const r=await S(RBP,{images:[await toBlob(shrink(cv,1500))],modelTier:'default',cache:false});
+          const m=(r.text||'').match(/\{[\s\S]*\}/);if(!m)throw new Error('لم يرجع وصف صالح');
+          const o=JSON.parse(m[0]);o.blocks=(o.blocks||[]).filter(b=>b&&b.t);o.acts=o.blocks.filter(b=>b.t==='activity');
+          sp=o;
+        }catch(e){if(e&&e.code==='not_granted')throw e}
+      }
+      if(!sp){fails.push(p+1);continue}
       let sec=null;
       for(const b of sp.blocks){
         if(b.t==='section')sec=b;
         if(b.t!=='activity')continue;
         const i=sp.acts.indexOf(b),c=card(sp,b,sec);
         if($('rbm').value==='full')c._full={sp,i,L:null};
-        pieces.push({c,keep:true,pg:p,ans:b.a||'',k:'',label:'صفحة '+(p+1)+' / نشاط '+(b.num||i+1)});
+        np.push({c,keep:true,pg:p,ans:b.a||'',k:'',label:'صفحة '+(p+1)+' / نشاط '+(b.num||i+1)});
       }
     }
-    draw();st.textContent='تمت إعادة بناء '+pages.length+' صفحة، وفيها '+pieces.length+' نشاط. راجع الإجابات وعدّلها ثم اصنع الفيديو.';
+    if(np.length){if(old.length)hist.push(old.slice());pieces=np;draw()}
+    const fm=fails.length?' تعذر تحليل الصفحات: '+fails.join('، ')+'، أعد المحاولة بزر التحليل أو استخدم القص بالصور لها.':'';
+    st.textContent=np.length?'تمت إعادة بناء '+(pages.length-fails.length)+' صفحة، وفيها '+np.length+' نشاط. راجع الإجابات وعدّلها ثم اصنع الفيديو.'+fm:'لم تنجح إعادة بناء أي صفحة.'+fm;
   }catch(e){st.textContent=e&&e.code==='not_granted'?'لم تتم الموافقة على استخدام Claude.':'تعذرت إعادة البناء: '+((e&&e.message)||e)}
   finally{$('rbgo').disabled=false}
 };
