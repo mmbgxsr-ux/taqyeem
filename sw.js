@@ -1,4 +1,4 @@
-const V='vt-v16';
+const V='vt-v19';
 const SHELL=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png','./icon-192-maskable.png','./icon-512-maskable.png'];
 const LOCAL=['./lib/mp4-muxer.js','./lib/pdf.min.js','./lib/pdf.worker.min.js','./fonts/fonts.css'];
 const EXT=['https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.3/build/mp4-muxer.js','https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js','https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'];
