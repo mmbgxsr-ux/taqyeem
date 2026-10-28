@@ -78,6 +78,49 @@ dialog#ed::backdrop{background:rgba(10,15,30,.55)}
 #ordl .on_{flex:1;min-width:0;overflow:hidden}#ordl .on_ b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #ordl .on_ span{font-size:.8rem;color:var(--mut)}#ordl .oi .no{font-weight:700;color:var(--acc);min-width:26px;text-align:center}
 #ordl .oi[draggable=true]{cursor:grab}
+dialog#rs{width:min(560px,96vw);max-height:92vh;overflow:auto;border:0;border-radius:18px;padding:16px;background:var(--card);color:var(--ink);box-shadow:0 12px 40px rgba(0,0,0,.35)}
+dialog#rs::backdrop{background:rgba(10,15,30,.55)}
+#rsc{width:auto;max-width:100%;max-height:38vh;margin:0 auto;display:block;border:1px solid var(--line);background:#fff;border-radius:6px}
+#rs .warn{color:#8a5200}@media (prefers-color-scheme:dark){#rs .warn{color:#f2c879}}
+/* ---- مظهر عصري: ألوان هادئة، بطاقات نظيفة، وشريط تنقل عائم ---- */
+:root{--bg:#f2f4fa;--card:#fff;--ink:#16213f;--mut:#64708f;--acc:#2f4bd8;--acc2:#5b6cf0;--ok:#0f9d73;--line:#e2e6f1;--sh:0 1px 2px rgba(22,33,63,.05),0 8px 22px -10px rgba(22,33,63,.14)}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1424;--card:#171f35;--ink:#e9edf8;--mut:#9aa6c4;--acc:#7f94ff;--acc2:#a3b1ff;--ok:#38c795;--line:#27314f;--sh:0 1px 2px rgba(0,0,0,.3),0 10px 26px -12px rgba(0,0,0,.55)}button,.btn{color:#0d1424!important}button.alt{color:var(--acc)!important}.stp.cur{color:#0d1424}}
+body{background:radial-gradient(900px 360px at 90% -90px,color-mix(in srgb,var(--acc) 15%,transparent),transparent 70%),var(--bg) fixed}
+main{max-width:1040px;padding:22px 18px 124px}
+h1{font-size:1.8rem;font-weight:800;margin:10px 0 4px}
+.sub{font-size:1rem;margin-bottom:20px}
+section{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px;box-shadow:var(--sh)}
+h2{font-size:1.2rem;font-weight:700}
+.row{gap:14px}
+label{font-weight:600;font-size:.88rem}
+button,.btn{background:linear-gradient(180deg,var(--acc2),var(--acc));color:#fff;border-radius:12px;padding:10px 20px;box-shadow:0 1px 0 rgba(255,255,255,.25) inset,0 6px 14px -6px color-mix(in srgb,var(--acc) 70%,transparent);transition:transform .12s,filter .12s,background .15s}
+button:hover:not(:disabled),.btn:hover{filter:brightness(1.07)}
+button:active:not(:disabled){transform:scale(.97)}
+button.alt{background:transparent;color:var(--acc);border:1.5px solid color-mix(in srgb,var(--acc) 35%,var(--line));box-shadow:none}
+button.alt:hover:not(:disabled){background:color-mix(in srgb,var(--acc) 9%,transparent);filter:none}
+.btn.ok,button.ok{background:linear-gradient(180deg,color-mix(in srgb,var(--ok) 78%,#fff),var(--ok))}
+select,input[type=number],input[type=text],textarea{background:color-mix(in srgb,var(--ink) 3%,var(--card))!important;border:1.5px solid var(--line);border-radius:12px;color:var(--ink);transition:border-color .15s,box-shadow .15s}
+select:focus,input:focus,textarea:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 4px color-mix(in srgb,var(--acc) 18%,transparent)}
+input[type=checkbox]{accent-color:var(--acc)}
+#drop{border:2px dashed color-mix(in srgb,var(--acc) 45%,transparent);border-radius:22px;padding:46px 18px;background:color-mix(in srgb,var(--acc) 6%,transparent);color:var(--acc);transition:background .15s,border-color .15s}
+#drop:hover,#drop.on{background:color-mix(in srgb,var(--acc) 13%,transparent);border-color:var(--acc)}
+#grid{gap:14px}
+.th{background:var(--card);border:1.5px solid color-mix(in srgb,var(--ok) 60%,transparent);border-radius:16px;padding:8px;box-shadow:var(--sh)}
+.th.off{border-color:var(--line);opacity:.45}
+.th canvas{border-radius:10px;border:1px solid var(--line)}
+.th small{font-weight:600;margin-top:6px}
+.tb{gap:6px}
+#bar{height:12px;border-radius:99px}
+#bar i{background:linear-gradient(90deg,var(--acc),var(--ok));border-radius:99px}
+video{border-radius:14px}
+details>summary{padding:6px 0}
+dialog{border:0;border-radius:20px;padding:18px;background:var(--card);color:var(--ink);box-shadow:0 20px 60px rgba(8,12,30,.4)}
+dialog::backdrop{background:rgba(10,15,30,.5);-webkit-backdrop-filter:blur(5px);backdrop-filter:blur(5px)}
+.steps{inset:auto 12px calc(12px + env(safe-area-inset-bottom,0px)) 12px;max-width:520px;margin:0 auto;padding:6px;border:1px solid var(--line);border-radius:24px;background:color-mix(in srgb,var(--card) 86%,transparent);box-shadow:0 12px 32px -10px rgba(22,33,63,.3)}
+@media (min-width:700px){.steps{padding-inline:6px}}
+.stp{border-radius:18px;font-weight:600;transition:background .15s,color .15s}
+.stp.cur{background:var(--acc);color:#fff}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
@@ -193,6 +236,8 @@ dialog#ed::backdrop{background:rgba(10,15,30,.55)}
   <button class="alt sm" id="bdura">مدة تلقائية للمحدد</button>
   <select id="bpen" aria-label="لون القلم للمحدد"><option value="">قلم أزرق</option><option value="g">أخضر ✓</option><option value="r">أحمر ✗</option></select>
   <button class="alt sm" id="bpengo">طبّق اللون</button>
+  <button class="alt sm" id="brs">📐 غيّر أبعاد المحدد</button>
+  <button class="alt sm" id="bdel">🗑 احذف المحدد</button>
 </div>
 <div id="grid"></div></div>
 
@@ -273,6 +318,26 @@ dialog#ed::backdrop{background:rgba(10,15,30,.55)}
 <dialog id="ed" aria-label="تعديل القالب">
   <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:10px"><b>تعديل القالب</b><span><button id="edok" class="ok sm">تطبيق</button> <button id="edx" class="alt sm">إلغاء</button></span></div>
   <div class="edg"><div><img id="edimg" alt="الصفحة الأصلية"><p class="note" id="ednote"></p></div><div id="edf" style="max-height:70vh;overflow:auto"></div></div>
+</dialog>
+
+<dialog id="rs" aria-label="تغيير أبعاد القطعة">
+  <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:10px"><b id="rst">تغيير الأبعاد</b><span><button id="rsok" class="ok sm">تطبيق</button> <button id="rsx" class="alt sm">إلغاء</button></span></div>
+  <canvas id="rsc" aria-label="معاينة الأبعاد الجديدة"></canvas>
+  <p class="note" id="rsi"></p>
+  <div class="row" style="margin-top:8px">
+    <label>العرض (بكسل)<input type="number" id="rsw" min="16" max="6000"></label>
+    <label>الارتفاع (بكسل)<input type="number" id="rsh" min="16" max="6000"></label>
+    <label>النسبة %<input type="number" id="rspc" min="5" max="400"></label>
+  </div>
+  <div class="row" style="margin-top:8px;align-items:center">
+    <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="rslk" checked> حفظ نسبة العرض إلى الارتفاع (بدون تشويه)</label>
+    <label>مقاس جاهز<select id="rsp"><option value="">— اختر —</option><option value="1280x720">16:9 — 1280×720</option><option value="1920x1080">16:9 — 1920×1080</option><option value="1080x1080">1:1 — 1080×1080</option><option value="1080x1350">4:5 — 1080×1350</option><option value="1024x768">4:3 — 1024×768</option></select></label>
+  </div>
+  <div class="row" id="rsmr" style="margin-top:8px" hidden>
+    <label>عند اختلاف النسبة<select id="rsm"><option value="contain">إبقاء الصورة كاملة مع هوامش بيضاء</option><option value="cover">ملء الإطار (قد يُقص جزء من الحواف)</option><option value="stretch">تمديد (قد يشوّه الصورة)</option></select></label>
+  </div>
+  <div class="row" style="margin-top:10px"><button class="alt sm" id="rsr">↺ استرجاع الأصل</button></div>
+  <p class="note">يُحفظ الأصل دائماً، فيمكنك التغيير مراراً دون أي فقد في الجودة، أو الرجوع بزر «استرجاع الأصل» أو «تراجع».</p>
 </dialog>
 
 <script>
@@ -512,6 +577,7 @@ function merge(i){
   x.drawImage(a.c,(w-a.c.width)/2,0);x.drawImage(b.c,(w-b.c.width)/2,a.c.height+g);
   pieces.splice(i,2,{c:to169(c),keep:true,pg:a.pg,label:a.label+' + دمج'});draw();
 }
+function delPieces(l){snap();pieces=pieces.filter(p=>!l.includes(p));draw();$('info').textContent='حُذفت '+l.length+' قطعة. اضغط «تراجع» لاسترجاعها.'}
 function mv(i,k){snap();const j=i+k;[pieces[i],pieces[j]]=[pieces[j],pieces[i]];draw()}
 function draw(){
   const g=$('grid');g.innerHTML='';
@@ -520,13 +586,13 @@ function draw(){
     const v=document.createElement('canvas');v.width=320;v.height=180;frame(v.getContext('2d'),320,180,pc.c,pc.ans,1,pc.k);
     v.setAttribute('role','button');v.tabIndex=0;v.setAttribute('aria-label','تضمين أو استبعاد: '+pc.label);v.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();v.click()}};
     v.onclick=()=>{pc.keep=!pc.keep;d.classList.toggle('off',!pc.keep);upd()};
-    const s=document.createElement('small');s.textContent=pc.label+(!pc.c._full&&layout(pc.c,1280,720,!!pc.ans&&$('hand').checked).sc?' • تمرير تلقائي':'');
+    const s=document.createElement('small');s.textContent=pc.label+(pc.orig?' • '+pc.c.width+'×'+pc.c.height:'')+(!pc.c._full&&layout(pc.c,1280,720,!!pc.ans&&$('hand').checked).sc?' • تمرير تلقائي':'');
     const t=document.createElement('div');t.className='tb';
     const mk=(txt,tip,fn,dis)=>{const b=document.createElement('button');b.className='alt sm';b.textContent=txt;b.title=tip;b.setAttribute('aria-label',tip);b.disabled=!!dis;b.onclick=fn;return b};
     const inp=document.createElement('input');inp.type='number';inp.min=1;inp.max=300;inp.placeholder=dur({ans:pc.ans});inp.value=pc.d||'';inp.title='مدة هذه القطعة بالثواني';inp.setAttribute('aria-label','مدة هذه القطعة بالثواني');
     inp.oninput=()=>{pc.d=+inp.value||0;updTot()};
     t.append(mk('→','قدّم القطعة',()=>mv(i,-1),i==0),mk('←','أخّر القطعة',()=>mv(i,1),i==pieces.length-1),
-      mk('✂','قسّم القطعة نصفين',()=>split(i)),mk('دمج','ادمج مع التالية',()=>merge(i),i==pieces.length-1),inp);
+      mk('✂','قسّم القطعة نصفين',()=>split(i)),mk('دمج','ادمج مع التالية',()=>merge(i),i==pieces.length-1),mk('📐','غيّر أبعاد القطعة (يُحفظ الأصل)',()=>openRs([pc]),!!pc.c._full),mk('🗑','احذف القطعة نهائياً (يمكن التراجع)',()=>delPieces([pc])),inp);
     const ta=document.createElement('textarea');ta.rows=2;ta.placeholder='الإجابة (اكتبها أو عدّلها)';ta.setAttribute('aria-label','الإجابة: '+pc.label);ta.value=pc.ans||'';
     ta.style.cssText='width:100%;margin-top:6px;font:inherit;font-size:.85rem;border:1px solid var(--line);border-radius:6px;padding:4px;background:transparent;color:inherit';
     ta.oninput=()=>{pc.ans=ta.value;pc.chk='';pc.lib=false;updTot()};ta.onchange=()=>frame(v.getContext('2d'),320,180,pc.c,pc.ans,1,pc.k);
@@ -1250,7 +1316,7 @@ function regen(sp){
     if(!p.rb||p.rb.sp!==sp)continue;
     const c=cards[p.rb.i];if(!c)continue;
     if(p.c._full)c._full={sp,i:p.rb.i,L:null};
-    p.c=c;
+    p.c=c;p.orig=null;
   }
 }
 $('edok').onclick=()=>{
@@ -1503,6 +1569,125 @@ addEventListener('beforeunload',e=>{
   if(rec||pendingDl>0||unsaved){e.preventDefault();e.returnValue='';return ''}
 });
 try{if(navigator.deviceMemory&&navigator.deviceMemory<=2){$('lowmem').checked=true}}catch(_){}
+
+/* ---- تغيير أبعاد القطعة بعد القص (يحفظ الأصل ويعيد التحجيم منه دائماً) ---- */
+let openRs;
+(()=>{
+  const MAXS=6000,MAXA=16e6,dlg=$('rs'),pv=$('rsc');
+  let tg=[],tm=0;
+  const srcOf=p=>p.orig||p.c;
+  const unres=p=>{const q={...p,c:srcOf(p)};delete q.orig;return q};
+  function hq(src,w,h){
+    let c=src,cw=src.width,ch=src.height;
+    while(cw/2>=w&&ch/2>=h){
+      const t=document.createElement('canvas');cw=Math.floor(cw/2);ch=Math.floor(ch/2);t.width=cw;t.height=ch;
+      const x=t.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(c,0,0,cw,ch);c=t;
+    }
+    const o=document.createElement('canvas');o.width=w;o.height=h;
+    const x=o.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(c,0,0,w,h);return o;
+  }
+  function render(src,W,H,mode,f=1){
+    W=Math.max(1,Math.round(W*f));H=Math.max(1,Math.round(H*f));
+    const o=document.createElement('canvas');o.width=W;o.height=H;
+    const x=o.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,W,H);
+    const sw=src.width,sh=src.height;
+    if(mode==='cover'){
+      const s=Math.max(W/sw,H/sh),vw=Math.min(sw,Math.max(1,Math.round(W/s))),vh=Math.min(sh,Math.max(1,Math.round(H/s)));
+      const cr=document.createElement('canvas');cr.width=vw;cr.height=vh;
+      cr.getContext('2d').drawImage(src,Math.round((sw-vw)/2),Math.round((sh-vh)/2),vw,vh,0,0,vw,vh);
+      x.drawImage(hq(cr,W,H),0,0);
+    }else if(mode==='contain'){
+      const s=Math.min(W/sw,H/sh),dw=Math.max(1,Math.round(sw*s)),dh=Math.max(1,Math.round(sh*s));
+      x.drawImage(hq(src,dw,dh),Math.round((W-dw)/2),Math.round((H-dh)/2));
+    }else x.drawImage(hq(src,W,H),0,0);
+    return o;
+  }
+  const lock=()=>$('rslk').checked;
+  function dims(p){
+    const s=srcOf(p),W=Math.round(+$('rsw').value)||0;
+    if(lock())return{W,H:Math.max(1,Math.round(W*s.height/s.width)),mode:'stretch'};
+    return{W,H:Math.round(+$('rsh').value)||0,mode:$('rsm').value};
+  }
+  const bad=d=>d.W<16||d.H<16||d.W>MAXS||d.H>MAXS||d.W*d.H>MAXA;
+  function preview(){
+    clearTimeout(tm);
+    tm=setTimeout(()=>{
+      const p=tg[0],s=srcOf(p),d=dims(p),n=tg.length;
+      const ds=tg.map(dims),nb=ds.some(bad),up=tg.some((q,i)=>ds[i].W>srcOf(q).width||ds[i].H>srcOf(q).height);
+      $('rsok').disabled=nb||!ds.length;
+      let m='الأصل: '+s.width+'×'+s.height+' ← الجديد: '+d.W+'×'+d.H+(n>1?' (للقطعة الأولى من '+n+')':'');
+      $('rsi').className='note';
+      if(nb){m='الأبعاد خارج المسموح (من 16 حتى '+MAXS+' بكسل، وبحد أقصى 16 مليون بكسل).';$('rsi').className='note warn'}
+      else if(up){m+=' — التكبير فوق الأصل قد يقلل الوضوح.';$('rsi').className='note warn'}
+      $('rsi').textContent=m;
+      if(nb)return;
+      const r=render(s,d.W,d.H,d.mode,Math.min(1,560/Math.max(d.W,d.H)));
+      pv.width=r.width;pv.height=r.height;pv.getContext('2d').drawImage(r,0,0);
+    },80);
+  }
+  function sync(from){
+    const s=srcOf(tg[0]),ar=s.height/s.width;
+    if(from==='pc')$('rsw').value=Math.round(s.width*(+$('rspc').value||0)/100);
+    if(lock()){
+      if(from==='h')$('rsw').value=Math.round((+$('rsh').value||0)/ar);
+      $('rsh').value=Math.round((+$('rsw').value||0)*ar);
+    }
+    if(from!=='pc')$('rspc').value=Math.round((+$('rsw').value||0)/s.width*100);
+    $('rsh').disabled=lock()&&tg.length>1;
+    $('rsmr').hidden=lock();
+    preview();
+  }
+  $('rsw').oninput=()=>sync('w');
+  $('rsh').oninput=()=>sync('h');
+  $('rspc').oninput=()=>sync('pc');
+  $('rslk').onchange=()=>sync('w');
+  $('rsm').onchange=preview;
+  $('rsp').onchange=()=>{
+    const v=$('rsp').value;if(!v)return;
+    const [w,h]=v.split('x').map(Number);
+    $('rslk').checked=false;$('rsw').value=w;$('rsh').value=h;
+    $('rsh').disabled=false;$('rsmr').hidden=false;
+    $('rspc').value=Math.round(w/srcOf(tg[0]).width*100);preview();
+  };
+  openRs=list=>{
+    tg=list.filter(p=>!p.c._full);
+    if(!tg.length){$('info').textContent='هذه القطعة معاد بناؤها من القالب، ولا يمكن تغيير أبعادها من هنا.';return}
+    const c=tg[0].c;
+    $('rst').textContent=tg.length>1?'تغيير أبعاد '+tg.length+' قطعة':'تغيير أبعاد القطعة';
+    const o=srcOf(tg[0]);
+    $('rslk').checked=!(tg.length===1&&tg[0].orig&&Math.abs(c.width/c.height-o.width/o.height)>.01);
+    $('rsm').value='contain';$('rsp').value='';
+    $('rsw').value=c.width;$('rsh').value=c.height;
+    $('rsr').disabled=!tg.some(p=>p.orig);
+    sync('w');
+    $('rsw').value=c.width;$('rsh').value=c.height;
+    $('rspc').value=Math.round(c.width/o.width*100);
+    dlg.showModal();preview();
+  };
+  $('rsx').onclick=()=>dlg.close();
+  $('rsok').onclick=()=>{
+    snap();
+    tg.forEach(p=>{
+      const i=pieces.indexOf(p);if(i<0)return;
+      const s=srcOf(p),d=dims(p);
+      if(bad(d))return;
+      if(d.W===s.width&&d.H===s.height){pieces[i]=unres(p);return}
+      pieces[i]={...p,c:render(s,d.W,d.H,d.mode),orig:s};
+    });
+    dlg.close();draw();
+  };
+  $('rsr').onclick=()=>{
+    snap();
+    tg.forEach(p=>{const i=pieces.indexOf(p);if(i>=0&&p.orig)pieces[i]=unres(p)});
+    dlg.close();draw();
+  };
+  $('bdel').onclick=()=>{const l=pieces.filter(p=>p.sel);if(!l.length){$('bulkn').textContent='حدّد قطعة واحدة على الأقل أولاً';return}delPieces(l)};
+  $('brs').onclick=()=>{
+    const l=pieces.filter(p=>p.sel);
+    if(!l.length){$('bulkn').textContent='حدّد قطعة واحدة على الأقل أولاً';return}
+    openRs(l);
+  };
+})();
 </script>
 </body>
 </html>
