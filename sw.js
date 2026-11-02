@@ -1,4 +1,4 @@
-const V='vt-v30';
+const V='vt-v31';
 const SHELL=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png','./icon-192-maskable.png','./icon-512-maskable.png'];
 const LOCAL=['./lib/mp4-muxer.js','./lib/pdf.min.js','./lib/pdf.worker.min.js','./fonts/fonts.css'];
 const EXT=['https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.3/build/mp4-muxer.js','https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js','https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'];
@@ -44,10 +44,10 @@ self.addEventListener('fetch',e=>{
   e.respondWith((async()=>{
     const c=await caches.open(V),hit=await c.match(r,{ignoreSearch:true});
     if(u.origin===location.origin){
-      try{const res=await fetch(new Request(r.url,{cache:'no-cache'}));if(res.ok)c.put(r,res.clone());return res}
+      try{const res=await fetch(new Request(r.url,{cache:'no-cache'}));if(res.ok&&res.status===200)e.waitUntil(c.put(r,res.clone()).catch(()=>{}));return res}
       catch(_){return hit||(r.mode==='navigate'?c.match('./index.html'):Response.error())}
     }
-    const net=fetch(r).then(res=>{if(res&&(res.ok||res.type==='opaque'))c.put(r,res.clone());return res}).catch(()=>null);
+    const net=fetch(r).then(async res=>{if(res&&res.status!==206&&(res.ok||res.type==='opaque')){try{await c.put(r,res.clone())}catch(_){}}return res}).catch(()=>null);
     if(hit){e.waitUntil(net);return hit}
     const res=await net;
     return res||(r.mode==='navigate'?c.match('./index.html'):Response.error());

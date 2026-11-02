@@ -258,7 +258,7 @@ dialog::backdrop{background:rgba(10,15,30,.5);-webkit-backdrop-filter:blur(5px);
     </label>
     <label style="display:none"><input type="checkbox" id="autod"></label>
     <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="fast" checked> تسجيل سريع</label>
-    <label style="display:none"><input type="checkbox" id="hand"></label>
+    <label style="display:none"><input type="checkbox" id="hand" checked></label>
     <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="himg" checked> إظهار اليد وهي تمرّ على الكتابة الزرقاء في الصفحة</label>
     <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="cam" checked> كاميرا تتبع اليد (تكبير وتحريك من أعلى لأسفل)</label>
     <label>قوة التكبير<select id="camz"><option value="1.3">خفيفة</option><option value="1.7" selected>متوسطة</option><option value="2.2">قوية</option></select></label>
@@ -356,7 +356,7 @@ drop.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fi.click(
 drop.ondragover=e=>{e.preventDefault();drop.classList.add('on')};
 drop.ondragleave=()=>drop.classList.remove('on');
 drop.ondrop=e=>{e.preventDefault();drop.classList.remove('on');load(e.dataTransfer.files)};
-fi.onchange=()=>load(fi.files);
+fi.onchange=()=>{const l=[...fi.files];fi.value='';load(l)};
 
 function loadImg(f){return new Promise((res,rej)=>{const u=URL.createObjectURL(f),i=new Image();i.onload=()=>{URL.revokeObjectURL(u);res(i)};i.onerror=()=>{URL.revokeObjectURL(u);rej(new Error('تعذر قراءة الصورة'))};i.src=u})}
 
@@ -896,7 +896,7 @@ async function fastMake(sel,W,H){
       frame(ctx,W,H,pc.c,pc.ans,R?Math.min(1,Math.max(0,(e-S)/R)):1,pc.k,uOf(pc,e,S));
       const vf=new VideoFrame(cv,{timestamp:Math.round((t+k)*1e6),duration:Math.round(len*1e6)});
       ve.encode(vf,{keyFrame:k===0||n%8===0});vf.close();n++;k+=len;
-      if(ve.encodeQueueSize>8)await new Promise(r=>setTimeout(r,5));
+      while(ve.encodeQueueSize>8&&!err){chk();await new Promise(r=>setTimeout(r,5))}
     }
     t+=d;
     $('bar').firstChild.style.width=(t/total*90)+'%';
@@ -957,14 +957,15 @@ async function makeOne(sel,name){
   }
   const cv=document.createElement('canvas');cv.width=W;cv.height=H;
   const ctx=cv.getContext('2d');frame(ctx,W,H,sel[0].c,sel[0].ans,0,sel[0].k);
-  const types=audio?['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm']:['video/mp4;codecs=avc1','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
+  const types=audio?['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm']:['video/mp4;codecs=avc1','video/mp4','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
   const mime=types.find(t=>MediaRecorder.isTypeSupported(t));
   let rec,ac,src;
   try{
     const stream=cv.captureStream(10);
     if(audio){ac=new (window.AudioContext||window.webkitAudioContext)();const dest=ac.createMediaStreamDestination();
       src=ac.createBufferSource();src.buffer=audio;src.connect(dest);stream.addTrack(dest.stream.getAudioTracks()[0])}
-    rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:+$('br').value,audioBitsPerSecond:64000});
+    if(ac&&ac.state==='suspended'){try{await ac.resume()}catch(x){}}
+    rec=new MediaRecorder(stream,Object.assign({videoBitsPerSecond:+$('br').value,audioBitsPerSecond:64000},mime?{mimeType:mime}:{}));
   }catch(e){$('st').textContent='تعذر بدء التسجيل: '+e.message;return}
   const chunks=[];rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
   const stopped=new Promise(r=>rec.onstop=r);
@@ -984,7 +985,7 @@ async function makeOne(sel,name){
   }
   if(src){try{src.stop()}catch(e){}}
   rec.stop();await stopped;if(ac)ac.close();
-  const type=mime.split(';')[0],blob=new Blob(chunks,{type});
+  const type=(mime||rec.mimeType||'video/webm').split(';')[0],blob=new Blob(chunks,{type});
   finish(blob,type.includes('mp4')?'mp4':'webm',total,name);
 }
 function drawLessons(){
@@ -1001,7 +1002,7 @@ function drawLessons(){
 $('addl').onclick=()=>{
   const sel=pieces.filter(p=>p.keep);if(!sel.length)return;
   lessons.push({name:$('lname').value.trim()||('درس_'+(lessons.length+1)),sel,audio});
-  $('lname').value='';hist=[];pieces=[];pages=[];ents=[];renderOrd();pageCuts=[];audio=null;$('aud').value='';$('files').value='';
+  $('lname').value='';hist=[];pieces=[];pages=[];ents=[];renderOrd();pageCuts=[];pgc=[];audio=null;$('aud').value='';$('files').value='';
   $('grid').innerHTML='';$('apg').innerHTML='';$('cut').disabled=true;
   $('info').textContent='أُضيف الدرس للقائمة. اختر صفحات الدرس التالي.';
   drawLessons();upd();
@@ -1021,7 +1022,7 @@ async function runAll(){
       await makeOne(jobs[i].sel,jobs[i].name);
     }
     $('st').textContent='تم إنشاء '+jobs.length+' فيديو. نزّل كل واحد من الأسفل.';
-  }catch(e){if(e===CANCEL)$('st').textContent='تم إيقاف إنشاء الفيديو.';else throw e}
+  }catch(e){if(e===CANCEL)$('st').textContent='تم إيقاف إنشاء الفيديو.';else{console.error(e);$('st').textContent='تعذر إنشاء الفيديو: '+((e&&e.message)||e)}}
   finally{audio=keep;cancel=false;$('stop').hidden=true;unlockScreen();$('cut').disabled=!pages.length;upd()}
 }
 $('make').onclick=()=>preCheck(runAll);
@@ -1051,7 +1052,7 @@ acv.onpointermove=e=>{
   if(!drag)return;const H=acv.height/ak;
   acuts[asel]=Math.max((acuts[asel-1]??0)+20,Math.min((acuts[asel+1]??H)-20,ay(e)));paintAdj();
 };
-acv.onpointerup=()=>{drag=false};
+acv.onpointerup=acv.onpointercancel=()=>{drag=false};
 $('apg').onchange=e=>loadAdj(+e.target.value);
 $('aadd').onclick=()=>{
   if(!pages.length)return;
@@ -1063,7 +1064,7 @@ $('adel').onclick=()=>{if(asel>=0){acuts.splice(asel,1);asel=-1;paintAdj()}};
 $('aok').onclick=()=>{
   if(!pages.length)return;snap();
   const im=pgc[curPg]||pages[curPg],h=dimsOf(im)[1],pts=[0,...acuts.map(Math.round),h],np=[];
-  for(let i=0;i<pts.length-1;i++){const c=mkPiece(im,pts[i],pts[i+1]-pts[i]);if(c)np.push({c,keep:true,pg:curPg,y:pts[i],label:'صفحة '+(curPg+1)+' / قطعة '+(i+1)})}
+  for(let i=0;i<pts.length-1;i++){if(pts[i+1]-pts[i]<10)continue;const c=mkPiece(im,pts[i],pts[i+1]-pts[i]);if(c)np.push({c,keep:true,pg:curPg,y:pts[i],label:'صفحة '+(curPg+1)+' / قطعة '+(i+1)})}
   pageCuts[curPg]=acuts.slice();
   const at=Math.max(0,pieces.findIndex(p=>p.pg===curPg));
   pieces=pieces.filter(p=>p.pg!==curPg);pieces.splice(Math.min(at,pieces.length),0,...np);if($('pord').value==='auto')sortPieces();draw();
@@ -1193,11 +1194,14 @@ function enhance(c,x,w,h){
 }
 
 /* ---- حفظ المشاريع ---- */
-const idb=()=>new Promise((res,rej)=>{
+let _idb=null;
+const idb=()=>_idb||(_idb=new Promise((res,rej)=>{
   const r=indexedDB.open('vt-projects',2);
   r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains('p'))d.createObjectStore('p',{keyPath:'name'});if(!d.objectStoreNames.contains('q'))d.createObjectStore('q',{keyPath:'h'})};
-  r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);
-});
+  r.onsuccess=()=>{const d=r.result;d.onversionchange=()=>{d.close();_idb=null};d.onclose=()=>{_idb=null};res(d)};
+  r.onerror=()=>rej(r.error);
+  r.onblocked=()=>{};
+}).catch(e=>{_idb=null;throw e}));
 async function dbop(mode,fn,store='p'){
   const d=await idb();
   return new Promise((res,rej)=>{
@@ -1521,8 +1525,6 @@ $('rbgo').onclick=async()=>{
   }catch(e){st.textContent=e&&e.code==='not_granted'?'لم تتم الموافقة على استخدام Claude.':'تعذرت إعادة البناء: '+((e&&e.message)||e)}
   finally{$('rbgo').disabled=false}
 };
-addEventListener('beforeunload',e=>{if(pieces.length||lessons.length){e.preventDefault();e.returnValue=''}});
-
 if('serviceWorker' in navigator){
   addEventListener('load',()=>{
     const had=!!navigator.serviceWorker.controller;
@@ -1708,7 +1710,7 @@ function preCheck(go){
 /* ---- أمان: تنبيه الإغلاق + توفير الذاكرة ---- */
 addEventListener('beforeunload',e=>{
   const rec=!$('stop').hidden,unsaved=pieces.length&&(autoBusy||sigOf()!==autoSig);
-  if(rec||pendingDl>0||unsaved){e.preventDefault();e.returnValue='';return ''}
+  if(rec||pendingDl>0||unsaved||lessons.length){e.preventDefault();e.returnValue='';return ''}
 });
 try{if(navigator.deviceMemory&&navigator.deviceMemory<=2){$('lowmem').checked=true}}catch(_){}
 
