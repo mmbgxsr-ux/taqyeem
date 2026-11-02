@@ -1,8 +1,8 @@
-const V='vt-v31';
-const SHELL=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png','./icon-192-maskable.png','./icon-512-maskable.png'];
-const LOCAL=['./lib/mp4-muxer.js','./lib/pdf.min.js','./lib/pdf.worker.min.js','./fonts/fonts.css'];
-const EXT=['https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.3/build/mp4-muxer.js','https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js','https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'];
-const FONTS=['https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap','https://fonts.googleapis.com/css2?family=Playpen+Sans+Arabic:wght@400;600&display=swap'];
+const V='vt-v32';
+const SHELL=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png','./icon-192-maskable.png','./icon-512-maskable.png','./answers.html'];
+const LOCAL=['./lib/mp4-muxer.js','./lib/pdf.min.js','./lib/pdf.worker.min.js','./lib/jspdf.umd.min.js','./fonts/fonts.css'];
+const EXT=['https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.3/build/mp4-muxer.js','https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js','https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js','https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'];
+const FONTS=['https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap','https://fonts.googleapis.com/css2?family=Playpen+Sans+Arabic:wght@400;600&display=swap','https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=Amiri:wght@700&family=Aref+Ruqaa:wght@700&family=Cairo:wght@700&family=Lateef:wght@700&family=Katibeh&family=Harmattan:wght@700&family=Playpen+Sans+Arabic:wght@700&family=Marhey:wght@700&family=Vibes&family=Mada:wght@700&display=swap'];
 const HOSTS=['cdn.jsdelivr.net','cdnjs.cloudflare.com','fonts.googleapis.com','fonts.gstatic.com'];
 self.addEventListener('install',e=>{
   e.waitUntil((async()=>{

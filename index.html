@@ -14,6 +14,7 @@
 @media (prefers-color-scheme:dark){:root{--bg:#121826;--card:#1b2438;--ink:#e8ecf6;--mut:#9aa6c2;--acc:#7ea2f0;--ok:#3fae7a;--line:#2f3b57}select,input[type=number]{background:#121826!important}button{color:#0d1424}button.alt{background:transparent}.th{background:#151d30}}
 :root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:Cairo,Tahoma,"Segoe UI",sans-serif;line-height:1.6}
 main{max-width:980px;margin:0 auto;padding:18px}
 h1{font-size:1.5rem;margin:6px 0 2px}
@@ -146,10 +147,13 @@ dialog::backdrop{background:rgba(10,15,30,.5);-webkit-backdrop-filter:blur(5px);
     <div class="row" style="margin:8px 0;align-items:center">
       <b>ترتيب الصفحات</b>
       <button class="alt sm" id="ordrev">🔁 اعكس الترتيب</button>
-      <button class="ok sm" id="ordgo">التالي: قصّ الصفحات ←</button>
     </div>
     <p class="note">اسحب الصفحة لتغيير مكانها، أو استخدم أزرار ↑ ↓. أي تحريك يدوي يحوّل الترتيب إلى «يدوي». تغيير الترتيب يلغي القص الحالي.</p>
     <div id="ordl"></div>
+  </div>
+  <div class="row" id="nxt" style="margin:12px 0" hidden>
+    <button class="ok" id="nxans">التالي: كتابة الإجابات ←</button>
+    <button class="alt" id="nxskip">تخطَّ إلى القص (الصفحات محلولة سلفاً)</button>
   </div>
   <details id="tpld" style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">قوالب الإعدادات</summary>
     <div class="row" style="margin-top:8px;align-items:end">
@@ -163,8 +167,19 @@ dialog::backdrop{background:rgba(10,15,30,.5);-webkit-backdrop-filter:blur(5px);
   </details>
 </section>
 
-<section id="s2" data-tab="2">
-  <h2>٢. القص</h2>
+<section id="sa" data-tab="2">
+  <h2>٢. كتابة الإجابات</h2>
+  <p class="note" id="saempty">حمّل الصفحات أولاً من مرحلة «الصفحات».</p>
+  <div id="sabox" hidden>
+    <p class="note">اكتب الإجابات على الصفحات، ثم اضغط «التالي: القص» في أعلى الأداة. وإن كانت الصفحات محلولة سلفاً فتخطَّ هذه المرحلة.</p>
+    <div class="row" style="margin:8px 0"><button class="alt sm" id="saskip">تخطَّ إلى القص</button></div>
+    <iframe id="saf" title="أداة كتابة الإجابات" allow="fullscreen" style="width:100%;height:calc(100dvh - 240px);min-height:520px;border:1px solid var(--line);border-radius:14px;background:var(--card)"></iframe>
+  </div>
+  <p class="note" id="sast" role="status" aria-live="polite"></p>
+</section>
+
+<section id="s2" data-tab="3">
+  <h2>٣. القص</h2>
   <div class="row">
     <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="r169" checked> قص تلقائي بنسبة 16:9 (يحدّد عدد القطع وحجمها حسب الصفحة)</label>
     <label>عدد القطع في كل صفحة (عند إيقاف 16:9 التلقائي)
@@ -227,7 +242,7 @@ dialog::backdrop{background:rgba(10,15,30,.5);-webkit-backdrop-filter:blur(5px);
 </section>
 
 <section id="noai" data-tab="0"><h2>٣. الإجابات</h2><p class="note">أدوات الاستخراج وإعادة بناء الصفحة تعمل داخل Claude فقط. يمكنك هنا كتابة الإجابات يدوياً في خانة كل قطعة.</p></section>
-<div id="gs" data-tab="2">
+<div id="gs" data-tab="3">
 <div id="bulk" class="row" style="margin:8px 0;align-items:center" hidden>
   <b id="bulkn">لا شيء محدد</b>
   <button class="alt sm" id="bsall">تحديد الكل</button>
@@ -244,7 +259,7 @@ dialog::backdrop{background:rgba(10,15,30,.5);-webkit-backdrop-filter:blur(5px);
 </div>
 <div id="grid"></div></div>
 
-<section id="s4" data-tab="3">
+<section id="s4" data-tab="4">
   <h2>٤. الفيديو</h2>
   <div class="row">
     <label>مدة كل قطعة (ثانية)
@@ -349,6 +364,7 @@ dialog::backdrop{background:rgba(10,15,30,.5);-webkit-backdrop-filter:blur(5px);
 <script>
 const $=id=>document.getElementById(id);
 let pages=[],pieces=[],TAB=1;
+let ansVer=0,ansSent=-1,ansDone=false,ansReady=false,ansFrame=null;
 
 const drop=$('drop'),fi=$('files');
 drop.onclick=()=>fi.click();
@@ -402,14 +418,14 @@ function thumbOf(p){
 function fmtDate(t){try{return t?new Date(t).toLocaleString('ar-SA-u-nu-latn',{dateStyle:'medium',timeStyle:'short'}):'بدون تاريخ'}catch(e){return new Date(t).toISOString().slice(0,16).replace('T',' ')}}
 function applyOrder(reset){
   pages=ents.map(e=>e.pg);
-  if(reset){pieces=[];hist=[];pageCuts=[];pgc=[];$('grid').innerHTML='';$('make').disabled=true;$('cut').disabled=!pages.length;try{fillAdj()}catch(e){}updSteps()}
+  if(reset){ansVer++;ansDone=false;pieces=[];hist=[];pageCuts=[];pgc=[];$('grid').innerHTML='';$('make').disabled=true;$('cut').disabled=!pages.length;try{fillAdj()}catch(e){}updSteps()}
   renderOrd();
   const n=ents.length;$('info').textContent='تم تحميل '+n+' صفحة.'+(lmNote||'')+(badNote||'');
 }
 let lmNote='',badNote='',dragI=-1;
 function renderOrd(){
   const box=$('ordl'),P=$('ordp');box.innerHTML='';
-  P.hidden=ents.length<2;
+  P.hidden=ents.length<2;$('nxt').hidden=!ents.length;
   ents.forEach((e,i)=>{
     const r=document.createElement('div');r.className='oi';r.draggable=true;
     const no=document.createElement('span');no.className='no';no.textContent=i+1;
@@ -440,7 +456,9 @@ $('ordm').onchange=()=>{
   if(m!=='manual'&&ents.length){sortEnts(m);applyOrder(true)}
 };
 $('ordrev').onclick=()=>{ents.reverse();$('ordm').value='manual';applyOrder(true)};
-$('ordgo').onclick=()=>{if(pages.length)showTab(2)};
+$('nxans').onclick=()=>{if(pages.length)showTab(2)};
+$('nxskip').onclick=()=>{if(pages.length)showTab(3)};
+$('saskip').onclick=()=>showTab(3);
 try{const m=localStorage.getItem('vt-ord');if(m&&[...$('ordm').options].some(o=>o.value===m))$('ordm').value=m}catch(e){}
 
 async function load(list){
@@ -467,9 +485,60 @@ async function load(list){
   if(m==='manual')ents.sort((a,b)=>a.fname.localeCompare(b.fname,undefined,{numeric:true})||a.pi-b.pi);
   else sortEnts(m);
   applyOrder(true);
-  if(ents.length===1)showTab(2);
-  else if(ents.length>1){$('info').textContent+=' راجع الترتيب ثم اضغط «التالي».';$('ordp').scrollIntoView({behavior:'smooth',block:'start'})}
+  if(ents.length===1)$('nxt').scrollIntoView({behavior:'smooth',block:'center'});
+  else if(ents.length>1){$('info').textContent+=' راجع الترتيب ثم اختر «التالي».';$('ordp').scrollIntoView({behavior:'smooth',block:'start'})}
 }
+
+/* ---- مرحلة الإجابات: أداة answers.html داخل إطار، وتبادل الصفحات بالرسائل ---- */
+function pageJpg(p){
+  const w=p.naturalWidth||p.width,h=p.naturalHeight||p.height,c=document.createElement('canvas');c.width=w;c.height=h;
+  const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(p,0,0);
+  return new Promise((res,rej)=>c.toBlob(b=>b?res(b):rej(new Error('تعذر ترميز الصفحة')),'image/jpeg',.95));
+}
+function enterAns(){
+  const has=pages.length>0;$('saempty').hidden=has;$('sabox').hidden=!has;
+  if(!has)return;
+  if(!ansFrame){
+    ansFrame=$('saf');ansFrame.src='answers.html?embed=1';
+    $('sast').textContent='جارٍ تحميل أداة الإجابات...';
+    setTimeout(()=>{if(!ansReady)$('sast').textContent='تعذر تحميل أداة الإجابات. يمكنك تخطي هذه المرحلة والمتابعة إلى القص.'},10000);
+  }else sendAns();
+}
+async function sendAns(){
+  if(!ansReady||ansSent===ansVer||!ents.length)return;
+  const v=ansVer;ansSent=v;$('sast').textContent='جارٍ تجهيز الصفحات للأداة...';
+  try{
+    const items=[];
+    for(const e of ents)items.push({blob:await pageJpg(e.pg),name:e.fname+(e.total>1?' ص'+e.pi:'')});
+    if(v!==ansVer){ansSent=-1;return sendAns()}
+    ansFrame.contentWindow.postMessage({t:'pages',items},'*');
+  }catch(err){ansSent=-1;$('sast').textContent='تعذر تجهيز الصفحات: '+((err&&err.message)||err)}
+}
+async function takeAns(items){
+  if(!Array.isArray(items)||items.length!==ents.length){$('sast').textContent='عدد الصفحات المستلمة لا يطابق الأصل. أعد المحاولة.';return}
+  $('sast').textContent='جارٍ استلام الصفحات...';
+  try{
+    const cs=[];
+    for(const it of items){
+      const bm=await createImageBitmap(it.blob),c=document.createElement('canvas');
+      c.width=bm.width;c.height=bm.height;c.getContext('2d').drawImage(bm,0,0);if(bm.close)bm.close();cs.push(c);
+    }
+    ents.forEach((e,i)=>{e.pg=cs[i]});
+    applyOrder(true);ansSent=ansVer;ansDone=true;
+    $('sast').textContent='';
+    $('info').textContent='استُلمت '+cs.length+' صفحة بإجاباتها. اضغط «قصّ الصفحات».';
+    showTab(3);
+  }catch(err){$('sast').textContent='تعذر استلام الصفحات: '+((err&&err.message)||err)}
+}
+addEventListener('message',e=>{
+  if(!ansFrame||e.source!==ansFrame.contentWindow||!e.data)return;
+  const m=e.data;
+  if(m.t==='ready'){ansReady=true;$('sast').textContent='';sendAns()}
+  else if(m.t==='loaded')$('sast').textContent='';
+  else if(m.t==='error')$('sast').textContent=m.msg||'حدث خطأ في أداة الإجابات';
+  else if(m.t==='skip')showTab(3);
+  else if(m.t==='done')takeAns(m.items);
+});
 
 /* ---- القص ---- */
 function inkRows(ctx,w,h,thr){
@@ -669,13 +738,14 @@ function draw(){
   upd();bulkInfo();
 }
 function upd(){pieces.forEach(p=>{if(p.c._full)p.c._full.sp.acts[p.c._full.i].skip=!p.keep});const k=pieces.some(p=>p.keep);$('save').disabled=!pieces.length;$('make').disabled=!(lessons.length||k);$('addl').disabled=!k;$('undo').disabled=!hist.length;$('libsave').disabled=!pieces.some(p=>p.ans);$('libuse').disabled=!pieces.length;updTot();updSteps()}
-const STEPS=[['الصفحات','📄'],['القص','✂️'],['الفيديو','🎬']];
+const STEPS=[['الصفحات','📄'],['الإجابات','✍️'],['القص','✂️'],['الفيديو','🎬']];
 function showTab(n){
   TAB=n;document.querySelectorAll('[data-tab]').forEach(e=>e.classList.toggle('on',e.dataset.tab.split(' ').includes(''+n)));
   scrollTo(0,0);updSteps();
+  if(n===2)enterAns();
 }
 function updSteps(){
-  const done=[pages.length>0||pieces.length>0,pieces.length>0,$('out').children.length>0],nav=$('steps');nav.innerHTML='';
+  const done=[pages.length>0||pieces.length>0,ansDone,pieces.length>0,$('out').children.length>0],nav=$('steps');nav.innerHTML='';
   STEPS.forEach((st,i)=>{
     const b=document.createElement('button');b.className='stp'+(done[i]?' done':'')+(i+1===TAB?' cur':'');
     b.innerHTML='<span class="ic"></span><span></span>';b.firstChild.textContent=st[1];b.lastChild.textContent=(done[i]?'✓ ':'')+st[0];
@@ -1291,7 +1361,7 @@ addEventListener('pagehide',autoSave);
     const b=document.createElement('div');b.className='note';b.setAttribute('role','alert');
     b.textContent='وُجد عمل غير مكتمل ('+a.ps.length+' قطعة'+(a.lname?'، '+a.lname:'')+'، '+new Date(a.t).toLocaleString('ar')+') ';
     const o=document.createElement('button');o.className='ok sm';o.textContent='استعادة';
-    o.onclick=async()=>{b.remove();await openProj(AUTO);autoSig=sigOf();showTab(2)};
+    o.onclick=async()=>{b.remove();await openProj(AUTO);autoSig=sigOf();showTab(3)};
     const x=document.createElement('button');x.className='alt sm';x.textContent='تجاهل';
     x.onclick=async()=>{b.remove();try{await dbop('readwrite',st=>st.delete(AUTO))}catch(e){}};
     b.append(o,' ',x);$('drop').parentNode.insertBefore(b,$('drop'));
@@ -1702,7 +1772,7 @@ function preCheck(go){
   const blocked=out.some(o=>o[0]==='err');
   $('pwgo').disabled=blocked;
   $('pwgo').onclick=()=>{$('pw').close();go()};
-  $('pwfix').onclick=()=>{pieces.forEach(p=>p.sel=bad.has(p));$('pw').close();draw();showTab(2)};
+  $('pwfix').onclick=()=>{pieces.forEach(p=>p.sel=bad.has(p));$('pw').close();draw();showTab(3)};
   $('pwfix').disabled=!bad.size&&!blocked?true:false;
   $('pw').showModal();
 }

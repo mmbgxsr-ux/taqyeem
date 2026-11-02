@@ -9,6 +9,7 @@ $libs = [ordered]@{
   'lib/mp4-muxer.js'      = 'https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.3/build/mp4-muxer.js'
   'lib/pdf.min.js'        = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'
   'lib/pdf.worker.min.js' = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
+  'lib/jspdf.umd.min.js'  = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'
 }
 foreach ($k in $libs.Keys) {
   Invoke-WebRequest -Uri $libs[$k] -OutFile $k -UserAgent $ua -UseBasicParsing
@@ -17,7 +18,8 @@ foreach ($k in $libs.Keys) {
 
 $fontUrls = @(
   'https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap',
-  'https://fonts.googleapis.com/css2?family=Playpen+Sans+Arabic:wght@400;600&display=swap'
+  'https://fonts.googleapis.com/css2?family=Playpen+Sans+Arabic:wght@400;600&display=swap',
+  'https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=Amiri:wght@700&family=Aref+Ruqaa:wght@700&family=Cairo:wght@700&family=Lateef:wght@700&family=Katibeh&family=Harmattan:wght@700&family=Playpen+Sans+Arabic:wght@700&family=Marhey:wght@700&family=Vibes&family=Mada:wght@700&display=swap'
 )
 $sha = [Security.Cryptography.SHA1]::Create()
 $all = @(); $count = 0
