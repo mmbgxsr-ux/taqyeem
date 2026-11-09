@@ -115,6 +115,23 @@ body.fs #fsb{display:flex;position:fixed;top:calc(6px + env(safe-area-inset-top,
 #fst{width:42px;padding:0;box-shadow:0 4px 14px rgba(0,0,0,.2)}
 #fpg{font-weight:600;color:var(--pri);padding:0 4px}
 @media (prefers-reduced-motion:no-preference){.sheet{animation:up .2s ease-out}@keyframes up{from{transform:translateY(16px);opacity:.3}}}
+/* ---- ملاءمة الهاتف: ارتفاع ديناميكي (شريط المتصفح)، وشاشات ضيقة، وأهداف لمس مريحة ---- */
+.sheet{max-height:50vh;max-height:50dvh}
+body.fs #ed{max-height:42vh;max-height:42dvh}
+body.fs #wrap{padding-bottom:45vh;padding-bottom:45dvh}
+#wrap{padding-bottom:42vh;padding-bottom:42dvh;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+@media (max-width:400px){
+  #top{gap:6px;padding-inline:10px}
+  #top h1{font-size:.95rem}
+  .grp.c3{grid-template-columns:repeat(2,1fr)}
+  .sheet{padding:14px 10px 12px;gap:8px}
+  #nav button{font-size:.7rem}
+  #nav button i{width:48px}
+}
+@media (max-height:560px) and (orientation:landscape){
+  .sheet{max-height:60dvh}
+  #empty svg.hero{display:none}
+}
 </style>
 <script src="lib/jspdf.umd.min.js" onerror="this.remove();var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';document.head.append(s)"></script>
 </head>
@@ -338,9 +355,38 @@ let pages=[],cur=-1;
 function store(){if(cur>=0&&pages[cur]){const p=pages[cur];p.boxes=boxes;p.lines=lines;p.hist=hist}}
 function showPage(i){store();cur=i;const p=pages[i];img=p.img;cv.width=img.naturalWidth;cv.height=img.naturalHeight;boxes=p.boxes;lines=p.lines;hist=p.hist;sel=null;$('ed').hidden=true;$('ds').textContent=lines.length?('تم كشف '+lines.length+' سطر منقط'):'';$('pg').textContent='صفحة '+(i+1)+' من '+pages.length;$('fpg').textContent=(i+1)+' / '+pages.length;$('empty').hidden=true;setZoom(1);draw()}
 function nav(d){const j=cur+d;if(j>=0&&j<pages.length)showPage(j)}
-$('f').onchange=async e=>{const fs=[...e.target.files];for(const f of fs){const i=new Image();await new Promise(r=>{i.onload=r;i.src=URL.createObjectURL(f)});pages.push({img:i,name:f.name,boxes:[],lines:[],hist:[]})}
-  if(fs.length)dirty=true;
-  if(fs.length)showPage(pages.length-fs.length);e.target.value=''};
+/* رفع الصور بدون امتلاء الذاكرة: تُصغَّر صور الهاتف الكبيرة فور قراءتها، وتُحرَّر روابطها المؤقتة */
+const MOB=(()=>{try{return matchMedia('(pointer:coarse)').matches||/Android|iPhone|iPad|iPod|Mobi/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)}catch(e){return false}})();
+const MAXSIDE=MOB?2200:4200;
+const freeC=c=>{try{c.width=0;c.height=0}catch(e){}};
+function imgFrom(b){return new Promise((ok,no)=>{const u=URL.createObjectURL(b),i=new Image();i.onload=()=>{URL.revokeObjectURL(u);ok(i)};i.onerror=()=>{URL.revokeObjectURL(u);no(new Error('img'))};i.src=u})}
+async function loadPage(f){
+  const im=await imgFrom(f),W=im.naturalWidth,H=im.naturalHeight,k=Math.min(1,MAXSIDE/Math.max(W,H));
+  if(k>=1)return im;
+  const w=Math.max(1,Math.round(W*k)),h=Math.max(1,Math.round(H*k));
+  let c=im,cw=W,ch=H,tmp=null;
+  while(cw/2>=w&&ch/2>=h){
+    const t=document.createElement('canvas');cw=Math.floor(cw/2);ch=Math.floor(ch/2);t.width=cw;t.height=ch;
+    const x=t.getContext('2d');x.imageSmoothingQuality='high';x.drawImage(c,0,0,cw,ch);
+    if(tmp)freeC(tmp);tmp=c=t;
+  }
+  const o=document.createElement('canvas');o.width=w;o.height=h;
+  const x=o.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.imageSmoothingQuality='high';x.drawImage(c,0,0,w,h);
+  if(tmp)freeC(tmp);
+  const bl=await new Promise(r=>o.toBlob(r,'image/jpeg',.92));freeC(o);
+  if(!bl)return im;
+  const small=await imgFrom(bl);
+  im.onload=im.onerror=null;im.src='';
+  return small;
+}
+$('f').onchange=async e=>{const fs=[...e.target.files];let n=0;
+  for(const f of fs){
+    try{const i=await loadPage(f);pages.push({img:i,name:f.name,boxes:[],lines:[],hist:[]});n++}
+    catch(err){alert('تعذر قراءة الصورة: '+f.name)}
+    await new Promise(r=>setTimeout(r));
+  }
+  if(n)dirty=true;
+  if(n)showPage(pages.length-n);e.target.value=''};
 
 let scope=0,gl=null,defStyle={};
 const SK=['size','color','font','thick','rot','nat','nv','fitAuto'];
@@ -348,8 +394,9 @@ function targets(){
   if(scope===0)return sel?[{b:sel,L:lines}]:[];
   if(scope===1)return boxes.filter(b=>!b.kind).map(b=>({b,L:lines}));
   store();return pages.flatMap(p=>p.boxes.filter(b=>!b.kind).map(b=>({b,L:p.lines})))}
-const PX=new WeakMap();
-function pxOf(im){let r=PX.get(im);if(!r){const c=document.createElement('canvas');c.width=im.naturalWidth;c.height=im.naturalHeight;const g=c.getContext('2d');g.drawImage(im,0,0);r={d:g.getImageData(0,0,c.width,c.height).data,W:c.width,H:c.height};PX.set(im,r)}return r}
+/* بيانات البكسلات لا تُحفظ إلا لآخر صفحتين، حتى لا تتراكم عشرات الميغابايتات لكل صفحة */
+const PX=new WeakMap(),PXK=[];
+function pxOf(im){let r=PX.get(im);if(!r){const c=document.createElement('canvas');c.width=im.naturalWidth;c.height=im.naturalHeight;const g=c.getContext('2d');g.drawImage(im,0,0);r={d:g.getImageData(0,0,c.width,c.height).data,W:c.width,H:c.height};freeC(c);PX.set(im,r);PXK.push(im);while(PXK.length>2)PX.delete(PXK.shift())}return r}
 function inkRow(r,y,x0,x1,thr){let n=0;for(let x=Math.max(0,Math.round(x0)+6);x<Math.min(r.W,x1-6);x+=3){const i=(y*r.W+x)*4;if(r.d[i]+r.d[i+1]+r.d[i+2]<thr&&++n>=4)return true}return false}
 function space(L,l){const im=L===lines?img:(pages.find(p=>p.lines===L)||{img}).img,r=pxOf(im),thr=+$('sv').value,lim=Math.round(r.H*.12),y0=Math.round(l.y);
   let A=0,D=0;
@@ -674,10 +721,10 @@ function saveProj(){
 $('pj').onchange=async e=>{const f=e.target.files[0];if(!f)return;
   try{await loadProj(JSON.parse(await f.text()))}catch(err){alert('ملف المشروع غير صالح')}
   e.target.value=''};
-function toUrl(i){const c=document.createElement('canvas');c.width=i.naturalWidth;c.height=i.naturalHeight;c.getContext('2d').drawImage(i,0,0);return c.toDataURL('image/jpeg',.85)}
+function toUrl(i){const c=document.createElement('canvas');c.width=i.naturalWidth;c.height=i.naturalHeight;c.getContext('2d').drawImage(i,0,0);const u=c.toDataURL('image/jpeg',.85);freeC(c);return u}
 function projData(){store();return{v:1,t:Date.now(),pages:pages.map(p=>({name:p.name,img:p.durl||(p.durl=toUrl(p.img)),boxes:p.boxes,lines:p.lines}))}}
 async function loadProj(j){const np=[];
-  for(const p of j.pages){const i=new Image();await new Promise((r,x)=>{i.onload=r;i.onerror=x;i.src=p.img});np.push({img:i,name:p.name,boxes:p.boxes||[],lines:p.lines||[],hist:[],durl:p.img})}
+  for(const p of j.pages){const i=new Image();await new Promise((r,x)=>{i.onload=r;i.onerror=x;i.src=p.img});np.push({img:i,name:p.name,boxes:p.boxes||[],lines:p.lines||[],hist:[],durl:MOB?null:p.img})}
   if(!np.length)throw 0;store();cur=-1;pages=np;showPage(0);dirty=false}
 
 /* حفظ تلقائي في المتصفح (IndexedDB) */
@@ -685,7 +732,9 @@ function idb(){return new Promise((res,rej)=>{const r=indexedDB.open('ansTool',1
 async function idbSet(v){const d=await idb();return new Promise((res,rej)=>{const t=d.transaction('s','readwrite');t.objectStore('s').put(v,'last');t.oncomplete=res;t.onerror=()=>rej(t.error)})}
 async function idbGet(){const d=await idb();return new Promise((res,rej)=>{const q=d.transaction('s').objectStore('s').get('last');q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})}
 async function autosave(){if(!pages.length||!dirty)return;
-  try{await idbSet(projData());dirty=false;$('as').textContent='حُفظ تلقائيًا '+new Date().toLocaleTimeString('ar')}catch(e){$('as').textContent='تعذر الحفظ التلقائي'}}
+  try{await idbSet(projData());dirty=false;$('as').textContent='حُفظ تلقائيًا '+new Date().toLocaleTimeString('ar')}catch(e){$('as').textContent='تعذر الحفظ التلقائي'}
+  /* على الهاتف لا نُبقي نصوص الصور (data URL) الضخمة في الذاكرة بعد الحفظ؛ تُعاد عند الحاجة */
+  if(MOB)pages.forEach(p=>{p.durl=null})}
 setInterval(autosave,60000);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)autosave()});
 idbGet().then(d=>{if(d&&d.pages&&d.pages.length&&!pages.length){
