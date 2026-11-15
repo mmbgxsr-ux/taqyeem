@@ -312,7 +312,9 @@ textarea{max-width:100%}
     <label style="display:none"><input type="checkbox" id="autod"></label>
     <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="fast" checked> تسجيل سريع</label>
     <label style="display:none"><input type="checkbox" id="hand" checked></label>
-    <label>حركة دخول كل قطعة بيد تسحبها<select id="ent"><option value="mixed" selected>متنوعة (من أسفل، يمين، أعلى، يسار)</option><option value="bottom">من الأسفل</option><option value="top">من الأعلى</option><option value="right">من اليمين</option><option value="left">من اليسار</option><option value="none">بدون حركة</option></select></label>
+    <label>نوع الانتقال بين القطع<select id="tr"><option value="mixed" selected>متنوع (سحب، إخراج باليد، قلب صفحة، تلاشي)</option><option value="slide">اليد تسحب القطعة الجديدة فوق القديمة</option><option value="pull">اليد تسحب القطعة القديمة للخارج</option><option value="flip">قلب صفحة</option><option value="fade">تلاشي</option></select></label>
+    <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="sfx" checked> صوت سحب الورقة عند كل انتقال</label>
+    <label>اتجاه السحب<select id="ent"><option value="mixed" selected>متنوعة (من أسفل، يمين، أعلى، يسار)</option><option value="bottom">من الأسفل</option><option value="top">من الأعلى</option><option value="right">من اليمين</option><option value="left">من اليسار</option><option value="none">بدون حركة</option></select></label>
     <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="himg" checked> إظهار اليد وهي تمرّ على الكتابة الزرقاء في الصفحة</label>
     <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="cam" checked> كاميرا تتبع اليد (تكبير وتحريك من أعلى لأسفل)</label>
     <label>قوة التكبير<select id="camz"><option value="1.3">خفيفة</option><option value="1.7" selected>متوسطة</option><option value="2.2">قوية</option></select></label>
@@ -934,14 +936,16 @@ function pathAt(c,r){
   const q=P.sg[P.sg.length-1];return{x:q.x1,y:q.y1};
 }
 const ez=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t)};
-/* ---- دخول القطعة: يد تسحب القطعة من جهة مختلفة فوق القطعة السابقة ---- */
+/* ---- انتقال القطع: سحب باليد (دخول/خروج) أو قلب صفحة أو تلاشي ---- */
 const entOf=(pc,d)=>{const e=$('ent');return(!e||e.value==='none')?0:Math.min(.9,d*.25)};
-const ENT_ORDER=['bottom','right','top','left'];
+const ENT_ORDER=['bottom','right','top','left'],TR_ORDER=['slide','pull','flip','fade'];
 let entC=null,entP=null,entPc=null,entPrev=null,entKk='';
 function frameAt(ctx,W,H,pc,e,d,i,S,R,prev){
   const E=entOf(pc,d),cl=x=>Math.max(0,Math.min(1,x));
   if(!E||e>=E){const e2=e-E;frame(ctx,W,H,pc.c,pc.ans,R?cl((e2-S)/R):1,pc.k,uOf(pc,e2,S));return}
-  const v=$('ent').value,dir=v==='mixed'?ENT_ORDER[i%4]:v;
+  const v=$('ent').value,dir=v==='mixed'?ENT_ORDER[(i+(i>>2))%4]:v;
+  let tr=$('tr').value;if(tr==='mixed')tr=TR_ORDER[i%4];
+  if(!prev&&tr!=='slide')tr='slide';
   if(!entC||entC.width!==W||entC.height!==H){
     entC=document.createElement('canvas');entC.width=W;entC.height=H;
     entP=document.createElement('canvas');entP.width=W;entP.height=H;entPc=null;
@@ -953,23 +957,68 @@ function frameAt(ctx,W,H,pc,e,d,i,S,R,prev){
     if(prev)frame(px,W,H,prev.c,prev.ans,1,prev.k,1);else{px.fillStyle='#fff';px.fillRect(0,0,W,H)}
     entPc=pc;entPrev=prev;entKk=kk;
   }
-  const p=e/E,t=1-Math.pow(1-p,3);
-  ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);ctx.drawImage(entP,0,0);
-  let ox=0,oy=0;
-  if(dir==='bottom')oy=(1-t)*H;else if(dir==='top')oy=-(1-t)*H;else if(dir==='right')ox=(1-t)*W;else ox=-(1-t)*W;
-  ctx.save();
-  ctx.shadowColor='rgba(0,0,0,.32)';ctx.shadowBlur=W*.02;
-  ctx.shadowOffsetX=dir==='right'?-W*.006:dir==='left'?W*.006:0;
-  ctx.shadowOffsetY=dir==='bottom'?-W*.006:dir==='top'?W*.006:0;
-  ctx.drawImage(entC,ox,oy);ctx.restore();
-  if($('himg').checked){
-    const sw=Math.sin(p*8)*W*.004;let hx,hy,sx=-1;
-    if(dir==='bottom'){hx=ox+W*.58;hy=oy+H*.05+sw}
-    else if(dir==='top'){hx=ox+W*.58;hy=oy+H-H*.05+sw}
-    else if(dir==='right'){hx=ox+W*.04;hy=H*.5+sw}
-    else{hx=ox+W-W*.04;hy=H*.5+sw;sx=1}
-    drawHand(ctx,hx,hy,W,sx);
+  const p=e/E,hand=$('himg').checked,sway=Math.sin(p*8)*W*.004;
+  const hh=(x,y,sx)=>{if(hand)drawHand(ctx,x,y,W,sx)};
+  const sh=(dx,dy)=>{ctx.shadowColor='rgba(0,0,0,.32)';ctx.shadowBlur=W*.02;ctx.shadowOffsetX=dx;ctx.shadowOffsetY=dy};
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
+  if(tr==='fade'){
+    ctx.drawImage(entP,0,0);ctx.globalAlpha=ez(p);ctx.drawImage(entC,0,0);ctx.globalAlpha=1;return;
   }
+  if(tr==='flip'){
+    ctx.drawImage(entC,0,0);
+    const a=ez(p),w=Math.max(1,W*Math.cos(a*Math.PI/2)),x0=W-w;
+    ctx.save();sh(-W*.008,0);ctx.drawImage(entP,x0,0,w,H);ctx.restore();
+    const g=ctx.createLinearGradient(x0,0,W,0);g.addColorStop(0,'rgba(0,0,0,'+(.2*a)+')');g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g;ctx.fillRect(x0,0,w,H);
+    hh(x0+W*.03,H*.55+sway,-1);return;
+  }
+  if(tr==='pull'){
+    const t=ez(p);let ox=0,oy=0;
+    if(dir==='bottom')oy=t*H;else if(dir==='top')oy=-t*H;else if(dir==='right')ox=t*W;else ox=-t*W;
+    ctx.drawImage(entC,0,0);
+    ctx.save();sh(dir==='right'?W*.006:dir==='left'?-W*.006:0,dir==='bottom'?W*.006:dir==='top'?-W*.006:0);
+    ctx.drawImage(entP,ox,oy);ctx.restore();
+    /* اليد تدفع القطعة القديمة من حافتها الخلفية فتبقى ظاهرة طوال الحركة */
+    if(dir==='bottom')hh(ox+W*.58,oy+H*.05+sway,-1);
+    else if(dir==='top')hh(ox+W*.58,oy+H-H*.05+sway,-1);
+    else if(dir==='right')hh(ox+W*.04,H*.5+sway,-1);
+    else hh(ox+W-W*.04,H*.5+sway,1);
+    return;
+  }
+  const t=1-Math.pow(1-p,3);let ox=0,oy=0;
+  if(dir==='bottom')oy=(1-t)*H;else if(dir==='top')oy=-(1-t)*H;else if(dir==='right')ox=(1-t)*W;else ox=-(1-t)*W;
+  ctx.drawImage(entP,0,0);
+  ctx.save();sh(dir==='right'?-W*.006:dir==='left'?W*.006:0,dir==='bottom'?-W*.006:dir==='top'?W*.006:0);
+  ctx.drawImage(entC,ox,oy);ctx.restore();
+  if(dir==='bottom')hh(ox+W*.58,oy+H*.05+sway,-1);
+  else if(dir==='top')hh(ox+W*.58,oy+H-H*.05+sway,-1);
+  else if(dir==='right')hh(ox+W*.04,H*.5+sway,-1);
+  else hh(ox+W-W*.04,H*.5+sway,1);
+}
+/* صوت سحب الورقة: ضجيج مفلتَر يُولَّد برمجياً ويُدمج مع صوت الملف (إن وُجد) */
+function addSwoosh(a,sr,t0,g){
+  const n=Math.floor(sr*.5),o=Math.floor(t0*sr);let l1=0,l2=0;
+  for(let i=0;i<n&&o+i<a.length;i++){
+    const x=i/n,env=Math.pow(Math.sin(Math.PI*Math.pow(x,.6)),2),k=.03+.45*Math.sin(Math.PI*x);
+    l1+=k*((Math.random()*2-1)-l1);l2+=k*(l1-l2);
+    a[o+i]+=(l1-l2)*env*g;
+  }
+}
+function mixSfx(sel,user){
+  const cb=$('sfx');if(!cb||!cb.checked)return user;
+  const durs=sel.map(dur),total=durs.reduce((x,y)=>x+y,0);
+  if(!sel.some((pc,i)=>entOf(pc,durs[i])>0))return user;
+  const sr=user?user.sampleRate:44100,ch=user?user.numberOfChannels:1,len=user?user.length:Math.ceil(total*sr)+1;
+  const oc=window.OfflineAudioContext||window.webkitOfflineAudioContext;if(!oc)return user;
+  const buf=new oc(1,1,sr).createBuffer(ch,len,sr);
+  const sfx=new Float32Array(len);let t=0;
+  sel.forEach((pc,i)=>{if(entOf(pc,durs[i])>0)addSwoosh(sfx,sr,t,user?.8:1.3);t+=durs[i]});
+  for(let c=0;c<ch;c++){
+    const o=buf.getChannelData(c);
+    if(user)o.set(user.getChannelData(c));
+    for(let j=0;j<len;j++){const v=o[j]+sfx[j];o[j]=v>1?1:v<-1?-1:v}
+  }
+  return buf;
 }
 /* إطار بكاميرا: تبدأ من الصفحة كاملة، تكبّر وتتبع القلم، ثم تعود للصفحة كاملة */
 function camFrame(ctx,W,H,c,L,r){
@@ -1153,6 +1202,11 @@ function finish(blob,ext,total,name,opfs){
   $('out').append(box);updSteps();
 }
 async function makeOne(sel,name){
+  const keep=audio;
+  try{audio=mixSfx(sel,keep)}catch(e){audio=keep}
+  try{return await makeOne0(sel,name)}finally{audio=keep}
+}
+async function makeOne0(sel,name){
   if(!window.MediaRecorder&&!window.VideoEncoder){$('st').textContent='هذا المتصفح لا يدعم التسجيل. استخدم Chrome أو Edge.';return}
   const W=+$('res').value,H=Math.round(W*9/16)&~1;
   if($('fast').checked){
@@ -1830,7 +1884,7 @@ function bulkInfo(){
   $('bpengo').onclick=()=>{if(!need())return;const k=$('bpen').value;sel().forEach(p=>p.k=k);draw()};
 
   /* القوالب */
-  const KEY='vt-templates',IDS=['parts','sens','enh','sec','res','br','fast','hand','scr','autod','amode','lowmem','r169','ent'];
+  const KEY='vt-templates',IDS=['parts','sens','enh','sec','res','br','fast','hand','scr','autod','amode','lowmem','r169','ent','tr','sfx'];
   const rd=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'{}')||{}}catch(_){return{}}};
   const wr=o=>{try{localStorage.setItem(KEY,JSON.stringify(o));return true}catch(_){return false}};
   const el=id=>$(id),st=m=>{$('tplst').textContent=m};
