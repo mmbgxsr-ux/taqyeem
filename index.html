@@ -303,7 +303,8 @@ dialog#ed,dialog#rs{max-height:92vh;max-height:92dvh}
     <label style="display:none"><input type="checkbox" id="autod"></label>
     <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="fast" checked> تسجيل سريع</label>
     <label style="display:none"><input type="checkbox" id="hand" checked></label>
-    <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="himg" checked> إظهار اليد وهي تمرّ على الكتابة الزرقاء في الصفحة</label>
+    <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="himg" checked> إظهار اليد وهي تمرّ على الكتابة في الصفحة</label>
+    <label>ما الذي تتبعه اليد<select id="hmode"><option value="all">كل الكتابة البارزة (سوداء وزرقاء وملوّنة)</option><option value="blue">الكتابة الزرقاء فقط</option></select></label>
     <label>كمّ القميص عند معصم اليد<select id="hsl"><option value="navy">كحلي</option><option value="gray">رمادي</option><option value="white">أبيض</option><option value="black">أسود</option><option value="red">أحمر</option><option value="green">أخضر</option><option value="">بدون كمّ (ذراع مقصوصة)</option></select></label>
     <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="cam" checked> كاميرا تتبع اليد (تكبير وتحريك من أعلى لأسفل)</label>
     <label>قوة التكبير<select id="camz"><option value="1.3">خفيفة</option><option value="1.7" selected>متوسطة</option><option value="2.2">قوية</option></select></label>
@@ -1011,16 +1012,29 @@ function drawHand(ctx,x,y,W,r){
   ctx.restore();return true;
 }
 /* كشف سطور الكتابة الزرقاء في صورة القطعة (مخزّنة على اللوحة) */
+const inkMode=()=>{const m=$('hmode');return m?m.value:'all'};
 function getInk(c){
-  if(c._ink)return c._ink;
-  const sc=Math.min(1,500/c.width),w=Math.max(1,Math.round(c.width*sc)),h=Math.max(1,Math.round(c.height*sc));
+  const M=inkMode();
+  if(c._ink&&c._inkM===M)return c._ink;
+  c._inkM=M;c._path=null;
+  const sc=Math.min(1,(M==='all'?900:500)/c.width),w=Math.max(1,Math.round(c.width*sc)),h=Math.max(1,Math.round(c.height*sc));
   const t=document.createElement('canvas');t.width=w;t.height=h;const x=t.getContext('2d',{willReadFrequently:true});
   x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(c,0,0,w,h);
   let d;try{d=x.getImageData(0,0,w,h).data}catch(e){return c._ink={b:[]}}
   const rc=new Int32Array(h),mn=new Int32Array(h).fill(w),mx=new Int32Array(h).fill(-1);
-  for(let y=0;y<h;y++)for(let i=0;i<w;i++){
+  /* وضع «كل الكتابة البارزة»: أي حبر أغمق بوضوح من لون الورقة (أسود أو أزرق أو ملوّن)، وليس الأزرق فقط */
+  let paper=255,thr=0;
+  if(M==='all'){
+    const hist=new Uint32Array(256);let cnt=0;
+    for(let o=0;o<d.length;o+=16){hist[(d[o]*77+d[o+1]*150+d[o+2]*29)>>8]++;cnt++}
+    let acc=0;for(let v=255;v>=0;v--){acc+=hist[v];if(acc>=cnt*.08){paper=v;break}}
+    thr=Math.min(185,paper*.68);
+  }
+  for(let y=2;y<h-2;y++)for(let i=2;i<w-2;i++){
     const o=(y*w+i)*4,r=d[o],g=d[o+1],b=d[o+2];
-    if(b>=100&&b-r>=45&&b-g>=20){rc[y]++;if(i<mn[y])mn[y]=i;if(i>mx[y])mx[y]=i}
+    let hit=b>=100&&b-r>=45&&b-g>=20;
+    if(!hit&&M==='all'){const l=(r*77+g*150+b*29)>>8;hit=l<thr||(Math.max(r,g,b)-Math.min(r,g,b)>=70&&l<paper-30)}
+    if(hit){rc[y]++;if(i<mn[y])mn[y]=i;if(i>mx[y])mx[y]=i}
   }
   const bands=[],gap=2;let cur=null;
   for(let y=0;y<h;y++){
@@ -1037,6 +1051,14 @@ function getInk(c){
   return c._ink={b:out};
 }
 const hasInkHand=c=>!c._full&&!c._pm&&$('himg')&&$('himg').checked&&getInk(c).b.length>0;
+/* صفحة واحدة تتحرك من الأعلى للأسفل: اليد تقرأ السطور والكاميرا تتبعها */
+const hasScrollHand=c=>!c._full&&c._pm&&$('himg')&&$('himg').checked&&getInk(c).b.length>0;
+function scrollY(c,r){let s=0,n=0;for(let t=-.04;t<=.0401;t+=.01){s+=pathAt(c,Math.max(0,Math.min(1,r+t))).y;n++}return s/n}
+function scrollHand(ctx,W,c,g,u){
+  const q=pathAt(c,u),x=g.ox+q.x*g.k,y=g.oy+q.y*g.k;
+  if(y<g.y0-30||y>g.y1+30)return;
+  drawHand(ctx,x,y+Math.sin(u*90)*W*.002,W,u);
+}
 const camOn=c=>!c._full&&$('cam')&&$('cam').checked&&hasInkHand(c);
 /* مسار القلم على كل السطور بإحداثيات الصورة: كتابة السطر من اليمين لليسار ثم انتقال للسطر التالي */
 function getPath(c){
@@ -1091,18 +1113,20 @@ function frame(ctx,W,H,c,ans,ratio=1,k='',u=0){
   if(c._full)return frameFull(ctx,W,H,c._full,ans,ratio,k);
   const T=(k==='g'?'✓ ':k==='r'?'✗ ':'')+(ans||'');
   ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
-  const on=!!ans&&$('hand').checked,L=layout(c,W,H,on),m=L.m,zh=L.zh;let geo=null;
+  const uIn=u,on=!!ans&&$('hand').checked,L=layout(c,W,H,on),m=L.m,zh=L.zh;let geo=null;
   ctx.imageSmoothingQuality='high';
   if(!on&&ratio<1&&camOn(c)){camFrame(ctx,W,H,c,L,ratio);return}
   if(L.sc){
-    const dw=c.width*L.wS,wh=zh-2*m,off=u*(c.height*L.wS-wh);geo={ox:(W-dw)/2,oy:m-off,k:L.wS,y0:m,y1:m+wh};
+    const dw=c.width*L.wS,wh=zh-2*m,mo=c.height*L.wS-wh;
+    if(!on&&mo>0&&hasScrollHand(c))u=Math.max(0,Math.min(1,(scrollY(c,u)*L.wS-wh*.42)/mo));
+    const off=u*mo,u0=u;geo={ox:(W-dw)/2,oy:m-off,k:L.wS,y0:m,y1:m+wh};
     ctx.drawImage(c,0,off/L.wS,c.width,wh/L.wS,(W-dw)/2,m,dw,wh);
   }else{
     const s=Math.min((W-2*m)/refW(c),(zh-2*m)/refH(c),(W-2*m)/c.width,(zh-2*m)/c.height,2.2),dw=c.width*s,dh=c.height*s;
     const oy=on?m+(zh-2*m-dh)/2:(H-dh)/2;geo={ox:(W-dw)/2,oy,k:s,y0:-1e9,y1:1e9};
     ctx.drawImage(c,(W-dw)/2,oy,dw,dh);
   }
-  if(!on){if(geo&&ratio<1&&hasInkHand(c))inkHand(ctx,W,c,geo,ratio);return}
+  if(!on){if(geo&&L.sc&&hasScrollHand(c))scrollHand(ctx,W,c,geo,uIn);else if(geo&&ratio<1&&hasInkHand(c))inkHand(ctx,W,c,geo,ratio);return}
   const aw=W-2*m,ah=H-zh-m;
   ctx.strokeStyle='#c9d3ea';ctx.lineWidth=Math.max(1,W/640);ctx.beginPath();ctx.moveTo(m,zh);ctx.lineTo(W-m,zh);ctx.stroke();
   ctx.direction='rtl';ctx.textAlign='right';ctx.textBaseline='top';ctx.fillStyle=k==='g'?'#157a3d':k==='r'?'#c0261f':'#1b3fa0';
