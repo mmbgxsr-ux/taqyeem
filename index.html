@@ -298,7 +298,7 @@ dialog#ed,dialog#rs{max-height:92vh;max-height:92dvh}
       <select id="res"><option value="1280">720p (مناسب للشرح)</option><option value="1920">1080p</option><option value="854">480p (أصغر حجماً)</option></select>
     </label>
     <label>الضغط
-      <select id="br"><option value="400000">قوي (أصغر حجم)</option><option value="900000" selected>متوسط</option><option value="2500000">خفيف (أعلى جودة)</option></select>
+      <select id="br"><option value="400000">قوي (أصغر حجم ممكن)</option><option value="900000" selected>متوسط (جودة عالية وحجم صغير)</option><option value="2500000">خفيف (أعلى جودة، حجم أكبر قليلاً)</option></select>
     </label>
     <label style="display:none"><input type="checkbox" id="autod"></label>
     <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="fast" checked> تسجيل سريع</label>
@@ -1300,17 +1300,55 @@ function loadMux(){
   })).catch(e=>{muxLib=null;throw e});
   return muxLib;
 }
+/* ---- التصدير السريع (WebCodecs): جودة ثابتة وحجم صغير ---- */
+/* المرشحون بالترتيب: H.264 بجودة ثابتة، ثم H.264 بمعدل متغير، ثم VP9 كحل أخير. كل مرشح يُجرَّب فعلياً قبل البدء */
+const VID_CANDS=[['avc1.640028','q','avc'],['avc1.4d0028','q','avc'],['avc1.640028','v','avc'],['avc1.4d0028','v','avc'],['avc1.420028','v','avc'],['vp09.00.31.08','q','vp9'],['vp09.00.31.08','v','vp9']];
+const qpOf=mux=>{const b=+$('br').value,q=b<=400000?33:b<=900000?27:22;return mux==='vp9'?Math.round(q*63/51):q};
+/* المحتوى ثابت في معظمه، فجودة عالية جداً (PSNR≈50) تكفيها معدلات منخفضة؛ تُضرب في نسبة البكسلات مقارنة بـ 720p */
+const vbrOf=(W,H)=>{const b=+$('br').value,base=b<=400000?250000:b<=900000?450000:1100000;return Math.round(base*Math.max(.6,Math.min(3,W*H/(1280*720))))};
+const vcache={};
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function probeEnc(cfg,mux,quant,cv){
+  return new Promise(res=>{
+    let n=0,done=false,ve=null;
+    const fin=ok=>{if(done)return;done=true;try{ve&&ve.close()}catch(e){}res(ok)};
+    try{
+      ve=new VideoEncoder({output:()=>{n++},error:()=>fin(false)});
+      ve.configure(cfg);
+      for(let i=0;i<3;i++){
+        const f=new VideoFrame(cv,{timestamp:i*100000,duration:100000});
+        ve.encode(f,Object.assign({keyFrame:i===0},quant?{[mux]:{quantizer:qpOf(mux)}}:{}));f.close();
+      }
+      ve.flush().then(()=>fin(n>0),()=>fin(false));
+      setTimeout(()=>fin(false),5000);
+    }catch(e){fin(false)}
+  });
+}
+async function pickVideoCfg(W,H,cv){
+  const key=W+'x'+H+'|'+$('br').value;
+  if(vcache[key])return vcache[key];
+  for(const [codec,mode,mux] of VID_CANDS){
+    const quant=mode==='q',vc={codec,width:W,height:H,framerate:10,latencyMode:'quality'};
+    if(mux==='avc')vc.avc={format:'avc'};
+    if(quant)vc.bitrateMode='quantizer';else{vc.bitrate=vbrOf(W,H);vc.bitrateMode='variable'}
+    try{
+      if(!(await VideoEncoder.isConfigSupported(vc)).supported)continue;
+      if(await probeEnc(vc,mux,quant,cv))return vcache[key]={cfg:vc,quant,mux};
+    }catch(e){}
+  }
+  const e=new Error('لا يوجد مشفّر فيديو يعمل على هذا الجهاز بهذه الأبعاد');e.noEnc=true;throw e;
+}
 async function fastMake(sel,W,H){
   if(!window.VideoEncoder)throw new Error('المتصفح لا يدعم التشفير السريع');
   await loadMux();
-  const vc={codec:'avc1.640028',width:W,height:H,bitrate:+$('br').value,framerate:10};
-  if(!(await VideoEncoder.isConfigSupported(vc)).supported)throw new Error('صيغة H.264 غير مدعومة');
+  const cv=document.createElement('canvas');cv.width=W;cv.height=H;const ctx=cv.getContext('2d');
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
+  const pick=await pickVideoCfg(W,H,cv),qp=qpOf(pick.mux);
   let ac=null,am='';
   if(audio){
     if(!window.AudioEncoder)throw new Error('تشفير الصوت غير مدعوم');
-    const ch=Math.min(2,audio.numberOfChannels);
     for(const codec of ['mp4a.40.2','opus']){
-      const c={codec,sampleRate:audio.sampleRate,numberOfChannels:ch,bitrate:64000};
+      const c={codec,sampleRate:audio.sampleRate,numberOfChannels:1,bitrate:48000};
       if((await AudioEncoder.isConfigSupported(c)).supported){ac=c;am=codec==='opus'?'opus':'aac';break}
     }
     if(!ac)throw new Error('تشفير الصوت غير مدعوم');
@@ -1324,51 +1362,62 @@ async function fastMake(sel,W,H){
       target=new Mp4Muxer.FileSystemWritableFileStreamTarget(wr);
     }catch(e){if(opfsName)rmOpfs(opfsName);fh=wr=target=null;opfsName=''}
   }
-  const muxer=new Mp4Muxer.Muxer({target:target||new Mp4Muxer.ArrayBufferTarget(),video:{codec:'avc',width:W,height:H},
-    ...(ac?{audio:{codec:am,numberOfChannels:ac.numberOfChannels,sampleRate:ac.sampleRate}}:{}),fastStart:target?false:'in-memory'});
+  const muxer=new Mp4Muxer.Muxer({target:target||new Mp4Muxer.ArrayBufferTarget(),video:{codec:pick.mux,width:W,height:H},
+    ...(ac?{audio:{codec:am,numberOfChannels:1,sampleRate:ac.sampleRate}}:{}),fastStart:target?false:'in-memory'});
+  let err=null,ve=null,ae=null;
+  const closeAll=()=>{try{ve&&ve.close()}catch(e){}try{ae&&ae.close()}catch(e){}};
   try{
-  let err=null;
-  const ve=new VideoEncoder({output:(c,m)=>muxer.addVideoChunk(c,m),error:e=>{err=e}});
-  ve.configure(vc);
-  const chk=()=>{if(cancel){try{ve.close()}catch(e){}throw CANCEL}};
+  ve=new VideoEncoder({output:(c,m)=>muxer.addVideoChunk(c,m),error:e=>{err=e}});
+  ve.configure(pick.cfg);
+  if(ac){ae=new AudioEncoder({output:(c,m)=>muxer.addAudioChunk(c,m),error:e=>{err=e}});ae.configure(ac)}
+  const chk=()=>{if(cancel){closeAll();throw CANCEL}if(err)throw err};
+  const total=sel.reduce((a,p)=>a+dur(p),0);
+  /* الصوت يُشفَّر تدريجياً مع الفيديو (أحادي القناة للكلام) فيتداخل في الملف ويبدأ التشغيل بسرعة */
+  let aFed=0;
+  const feed=async(upto,fin)=>{
+    if(!ae)return;
+    const sr=audio.sampleRate,nc=audio.numberOfChannels,maxN=Math.min(audio.length,Math.floor(upto*sr));
+    while(aFed<maxN&&(fin||aFed+sr<=maxN)){
+      chk();
+      const nf=Math.min(sr,maxN-aFed),buf=new Float32Array(nf);
+      for(let c=0;c<nc;c++){const d=audio.getChannelData(c);for(let j=0;j<nf;j++)buf[j]+=d[aFed+j]}
+      if(nc>1)for(let j=0;j<nf;j++)buf[j]/=nc;
+      const ad=new AudioData({format:'f32-planar',sampleRate:sr,numberOfFrames:nf,numberOfChannels:1,timestamp:Math.round(aFed/sr*1e6),data:buf});
+      ae.encode(ad);ad.close();aFed+=nf;
+      while(ae.encodeQueueSize>20&&!err){chk();await sleep(5)}
+    }
+  };
   const T0=performance.now();
-  const cv=document.createElement('canvas');cv.width=W;cv.height=H;const ctx=cv.getContext('2d');
-  const total=sel.reduce((a,p)=>a+dur(p),0);let t=0,n=0;
+  let t=0,lastKey=-99;
   for(let i=0;i<sel.length;i++){
-    const pc=sel[i],d=dur(pc),E=entOf(pc,d),{S,R}=plan(pc,W,H,d-E);
+    const pc=sel[i],d=dur(pc),E=entOf(pc,d),{S,R}=plan(pc,W,H,d-E),act=E+S+R;
+    let still=false;
     for(let k=0;k<d;){
       chk();
-      const len=Math.min(k<E+S+R?.1:1,d-k),e=k+len;
-      frameAt(ctx,W,H,pc,e,d,i,S,R,sel[i-1]);
-      const vf=new VideoFrame(cv,{timestamp:Math.round((t+k)*1e6),duration:Math.round(len*1e6)});
-      ve.encode(vf,{keyFrame:k===0||n%8===0});vf.close();n++;k+=len;
-      while(ve.encodeQueueSize>8&&!err){chk();await new Promise(r=>setTimeout(r,5))}
+      const len=Math.min(k<act?.1:2,d-k),e=k+len;
+      /* بعد انتهاء الحركة تبقى الصورة ثابتة: تُرسم مرة واحدة وتُكرَّر بمدة أطول */
+      if(k<act||!still){frameAt(ctx,W,H,pc,e,d,i,S,R,sel[i-1]);if(k>=act)still=true}
+      const gt=t+k,kf=k===0||gt-lastKey>=4;if(kf)lastKey=gt;
+      const vf=new VideoFrame(cv,{timestamp:Math.round(gt*1e6),duration:Math.round(len*1e6)});
+      ve.encode(vf,Object.assign({keyFrame:kf},pick.quant?{[pick.mux]:{quantizer:qp}}:{}));vf.close();k+=len;
+      while(ve.encodeQueueSize>8&&!err){chk();await sleep(5)}
+      await feed(t+k);
     }
     t+=d;
     $('bar').firstChild.style.width=(t/total*90)+'%';
     const rem=Math.ceil((performance.now()-T0)/(i+1)*(sel.length-i-1)/1000);
     $('st').textContent='جارٍ الإنشاء السريع... القطعة '+(i+1)+' من '+sel.length+(rem>1?'، متبقٍ حوالي '+rem+' ثانية':'');
-    await new Promise(r=>setTimeout(r));
+    await sleep(0);
   }
-  if(ac){
-    const ae=new AudioEncoder({output:(c,m)=>muxer.addAudioChunk(c,m),error:e=>{err=e}});
-    ae.configure(ac);
-    const sr=audio.sampleRate,ch=ac.numberOfChannels,maxN=Math.min(audio.length,Math.floor(total*sr));
-    for(let o=0;o<maxN;o+=sr){
-      const nf=Math.min(sr,maxN-o),buf=new Float32Array(nf*ch);
-      for(let c=0;c<ch;c++)buf.set(audio.getChannelData(c).subarray(o,o+nf),c*nf);
-      const ad=new AudioData({format:'f32-planar',sampleRate:sr,numberOfFrames:nf,numberOfChannels:ch,timestamp:Math.round(o/sr*1e6),data:buf});
-      ae.encode(ad);ad.close();
-    }
-    await ae.flush();ae.close();
-  }
-  await ve.flush();ve.close();
+  await feed(total,true);
+  if(ae){await ae.flush();ae.close();ae=null}
+  await ve.flush();ve.close();ve=null;
   if(err)throw err;
   muxer.finalize();
   if(wr){await wr.close();const f=await fh.getFile();ok=true;return {blob:f,ext:'mp4',total:total*1000,opfs:opfsName}}
   ok=true;
   return {blob:new Blob([muxer.target.buffer],{type:'video/mp4'}),ext:'mp4',total:total*1000};
-  }finally{if(!ok&&wr){try{await wr.abort()}catch(e){}rmOpfs(opfsName)}}
+  }finally{closeAll();if(!ok&&wr){try{await wr.abort()}catch(e){}rmOpfs(opfsName)}}
 }
 let outUrls=[],outFiles=[];
 async function rmOpfs(n){try{const d=await navigator.storage.getDirectory();await d.removeEntry(n)}catch(e){}}
@@ -1398,37 +1447,55 @@ async function makeOne(sel,name){
   const W=+$('res').value,H=Math.round(W*9/16)&~1;
   if($('fast').checked){
     $('bar').firstChild.style.width='0';
+    let msg='';
     try{const r=await fastMake(sel,W,H);finish(r.blob,r.ext,r.total,name,r.opfs);return}
-    catch(e){if(e===CANCEL)throw e;$('st').textContent='تعذر التسجيل السريع ('+e.message+')، سيتم التسجيل بالوقت الحقيقي.';await new Promise(r=>setTimeout(r,1500))}
+    catch(e){
+      if(e===CANCEL)throw e;msg=e.message;
+      /* بعض مشفّرات الهاتف تحتاج أبعاداً من مضاعفات 16: نجرب مرة ثانية قبل الرجوع للتسجيل العادي */
+      const W2=Math.ceil(W/16)*16,H2=Math.ceil(H/16)*16;
+      if(e.noEnc&&(W2!==W||H2!==H)){
+        try{const r=await fastMake(sel,W2,H2);finish(r.blob,r.ext,r.total,name,r.opfs);return}
+        catch(e2){if(e2===CANCEL)throw e2;msg=e2.message}
+      }
+    }
+    $('st').textContent='تعذر التسجيل السريع ('+msg+')، سيتم التسجيل بالوقت الحقيقي.';await sleep(1500);
   }
   const cv=document.createElement('canvas');cv.width=W;cv.height=H;
   const ctx=cv.getContext('2d');frame(ctx,W,H,sel[0].c,sel[0].ans,0,sel[0].k);
   const types=audio?['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm']:['video/mp4;codecs=avc1','video/mp4','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
   const mime=types.find(t=>MediaRecorder.isTypeSupported(t));
-  let rec,ac,src;
+  let rec,ac,src,vt=null;
+  /* المتصفح يتجاهل requestFrame إن لم يتغير الرسم: نلمس بكسلاً واحداً بشفافية 2% (غير مرئي) */
+  const poke=()=>{ctx.save();ctx.globalAlpha=.02;ctx.fillStyle='#fff';ctx.fillRect(0,0,1,1);ctx.restore();if(vt)try{vt.requestFrame()}catch(e){}};
   try{
-    const stream=cv.captureStream(10);
+    let stream=cv.captureStream(0);vt=stream.getVideoTracks()[0];
+    if(!(vt&&typeof vt.requestFrame==='function')){stream=cv.captureStream(10);vt=null}
     if(audio){ac=new (window.AudioContext||window.webkitAudioContext)();const dest=ac.createMediaStreamDestination();
       src=ac.createBufferSource();src.buffer=audio;src.connect(dest);stream.addTrack(dest.stream.getAudioTracks()[0])}
     if(ac&&ac.state==='suspended'){try{await ac.resume()}catch(x){}}
-    rec=new MediaRecorder(stream,Object.assign({videoBitsPerSecond:+$('br').value,audioBitsPerSecond:64000},mime?{mimeType:mime}:{}));
+    rec=new MediaRecorder(stream,Object.assign({videoBitsPerSecond:vbrOf(W,H),audioBitsPerSecond:48000},mime?{mimeType:mime}:{}));
   }catch(e){$('st').textContent='تعذر بدء التسجيل: '+e.message;return}
   const chunks=[];rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
   const stopped=new Promise(r=>rec.onstop=r);
   const total=sel.reduce((a,p)=>a+dur(p),0)*1000,t0=performance.now();
   rec.start(1000);if(src)src.start();
   for(const [i,pc] of sel.entries()){
-    const st=performance.now(),d=dur(pc),end=st+d*1000,{S,R}=plan(pc,W,H,d-entOf(pc,d));
+    const st=performance.now(),d=dur(pc),end=st+d*1000,E=entOf(pc,d),{S,R}=plan(pc,W,H,d-E),act=E+S+R;
+    let still=false,lastReq=0;
     while(performance.now()<end){
       if(cancel){try{rec.stop()}catch(x){}if(src){try{src.stop()}catch(x){}}if(ac)ac.close();throw CANCEL}
       const e=(performance.now()-st)/1000;
-      frameAt(ctx,W,H,pc,e,d,i,S,R,sel[i-1]);
+      /* بعد انتهاء الحركة: لا نعيد الرسم، ونطلب لقطة كل نصف ثانية فقط (حجم أصغر وجهد أقل) */
+      if(e<act||!still){frameAt(ctx,W,H,pc,e,d,i,S,R,sel[i-1]);if(e>=act)still=true;if(vt){vt.requestFrame();lastReq=performance.now()}}
+      else if(vt&&performance.now()-lastReq>=500){poke();lastReq=performance.now()}
       const done=performance.now()-t0;
       $('bar').firstChild.style.width=Math.min(100,done/total*100)+'%';
       $('st').textContent='جارٍ التسجيل... متبقٍ حوالي '+Math.max(0,Math.ceil((total-done)/1000))+' ثانية. لا تغلق هذه الصفحة.';
-      await new Promise(r=>setTimeout(r,100));
+      await sleep(still?250:100);
     }
   }
+  /* لقطة أخيرة قرب النهاية حتى لا تُقصّ الفترة الثابتة الأخيرة من الفيديو */
+  if(vt){for(let q=0;q<3;q++){poke();await sleep(120)}}
   if(src){try{src.stop()}catch(e){}}
   rec.stop();await stopped;if(ac)ac.close();
   const type=(mime||rec.mimeType||'video/webm').split(';')[0],blob=new Blob(chunks,{type});
