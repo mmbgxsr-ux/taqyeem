@@ -305,6 +305,10 @@ dialog#ed,dialog#rs{max-height:92vh;max-height:92dvh}
     <label style="display:none"><input type="checkbox" id="hand" checked></label>
     <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="himg" checked> إظهار اليد وهي تمرّ على الكتابة في الصفحة</label>
     <label>ما الذي تتبعه اليد<select id="hmode"><option value="all">كل الكتابة البارزة (سوداء وزرقاء وملوّنة)</option><option value="blue">الكتابة الزرقاء فقط</option></select></label>
+    <label>حركة اليد<select id="hpt"><option value="point" selected>تشير بالقلم على رقم السؤال فقط (بدون كتابة ولا تحرك على السطور)</option><option value="write">تكتب وتتحرك على السطور</option></select></label>
+    <label>نوع الانتقال بين القطع<select id="tr"><option value="mixed" selected>متنوع (سحب، إخراج باليد، قلب صفحة، تلاشي)</option><option value="slide">اليد تسحب القطعة الجديدة فوق القديمة</option><option value="pull">اليد تدفع القطعة القديمة للخارج</option><option value="flip">قلب صفحة</option><option value="fade">تلاشي</option></select></label>
+    <label>اتجاه السحب<select id="ent"><option value="mixed" selected>متنوع (أسفل، يمين، أعلى، يسار)</option><option value="bottom">من الأسفل</option><option value="top">من الأعلى</option><option value="right">من اليمين</option><option value="left">من اليسار</option><option value="none">بدون انتقال</option></select></label>
+    <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="sfx" checked> صوت سحب الورقة عند كل انتقال</label>
     <label>كمّ القميص عند معصم اليد<select id="hsl"><option value="navy">كحلي</option><option value="gray">رمادي</option><option value="white">أبيض</option><option value="black">أسود</option><option value="red">أحمر</option><option value="green">أخضر</option><option value="">بدون كمّ (ذراع مقصوصة)</option></select></label>
     <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="cam" checked> كاميرا تتبع اليد (تكبير وتحريك من أعلى لأسفل)</label>
     <label>قوة التكبير<select id="camz"><option value="1.3">خفيفة</option><option value="1.7" selected>متوسطة</option><option value="2.2">قوية</option></select></label>
@@ -787,7 +791,8 @@ function auBtns(pc,mk){
 }
 /* يضع صوت كل قطعة عند بدايتها فوق الصوت العام (إن وُجد) في مسار واحد */
 async function mixAudio(sel,base){
-  if(!sel.some(p=>p.au))return base;
+  const sfxOn=!!($('sfx')&&$('sfx').checked)&&sel.some(p=>entOf(p,dur(p))>0);
+  if(!sel.some(p=>p.au)&&!sfxOn)return base;
   const total=sel.reduce((a,p)=>a+dur(p),0),sr=AU_SR,len=Math.max(1,Math.ceil(total*sr));
   const out=mkBuf(len,sr,1),o=out.getChannelData(0);
   const put=(b,at)=>{
@@ -802,7 +807,7 @@ async function mixAudio(sel,base){
   };
   if(base)put(base,0);
   let t=0;
-  for(const p of sel){if(p.au)put(p.au,t+.1);t+=dur(p);await new Promise(r=>setTimeout(r))}
+  for(const p of sel){if(p.au)put(p.au,t+.1);if(sfxOn&&entOf(p,dur(p))>0)addSwoosh(o,sr,t,(p.au||base)?.8:1.3);t+=dur(p);await new Promise(r=>setTimeout(r))}
   for(let i=0;i<len;i++){const v=o[i];if(v>1)o[i]=1;else if(v<-1)o[i]=-1}
   return out;
 }
@@ -937,7 +942,7 @@ function layout(c,W,H,on){
   return{m,zh,wS,sc:mo==='off'?false:mo==='on'?ov>av*1.02:$('scr').checked&&ov>av*1.6};
 }
 const uOf=(pc,e,S)=>S?(pc.pm?ez((e/S-.06)/.88):Math.min(1,e/S)):0;
-function plan(pc,W,H,d){
+function plan0(pc,W,H,d){
   const on=!!pc.ans&&$('hand').checked;if(pc.c._full)return{S:0,R:on?Math.min(6,d*.7):0};
   if(pc.pm&&!on){const L=layout(pc.c,W,H,false);return{S:L.sc?d:0,R:0}}
   if(!on&&camOn(pc.c))return{S:0,R:d};
@@ -986,17 +991,20 @@ function drawHand(ctx,x,y,W,r){
   const H=HANDS;
   if(!H.write.i.complete||!H.write.i.naturalWidth)return false;
   const f=W*.15/H.write.w;
-  let slide=0,wp=0,ww=1,wh=0,jit=0;
-  if(typeof r==='number'){
+  let slide=0,wp=0,ww=1,wh=0,jit=0,flip=false;
+  if(r&&typeof r==='object'){slide=r.slide||0;flip=!!r.flip;jit=r.jit||0;ww=0;if(r.k==='hold')wh=1;else wp=1}
+  else if(typeof r==='number'){
     r=Math.max(0,Math.min(1,r));
     const cf=ez((r-.055)/.025),hw=ez((r-.94)/.02);
     slide=Math.max(1-ez(r/.06),ez((r-.96)/.04));
     wp=1-cf;wh=hw;ww=cf*(1-hw);
     jit=Math.sin(r*377)*W*.0012; /* ارتعاش خفيف جدًا كحركة يد بشرية */
   }
-  const dx=-slide*(x+W*.17),dy=slide*W*.08;
-  const rot=typeof r==='number'?Math.sin(r*53)*.012:0;
-  ctx.save();ctx.translate(x+dx+jit,y+dy+jit*.6);ctx.rotate(rot);
+  let dx=flip?slide*((W-x)+W*.17):-slide*(x+W*.17),dy=slide*W*.08;
+  const ro=(r&&typeof r==='object'&&r.rot)||0;
+  if(ro){const dist=slide*W*.5,ph=ro+.149;dx=Math.cos(ph)*dist;dy=Math.sin(ph)*dist}
+  const rot=(typeof r==='number'?Math.sin(r*53)*.012:0)+ro;
+  ctx.save();ctx.translate(x+dx+jit,y+dy+jit*.6);ctx.rotate(rot);if(flip)ctx.scale(-1,1);
   ctx.shadowColor='rgba(20,25,40,.32)';ctx.shadowBlur=W*.011;ctx.shadowOffsetX=-W*.005;ctx.shadowOffsetY=W*.006;
   ctx.imageSmoothingQuality='high';
   const sv=typeof document!=='undefined'&&document.getElementById('hsl'),pal=sv?SLV[sv.value]:SLV.navy;
@@ -1078,6 +1086,126 @@ function pathAt(c,r){
   const q=P.sg[P.sg.length-1];return{x:q.x1,y:q.y1};
 }
 const ez=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t)};
+/* ---- وضع الإشارة: اليد تشير بالقلم على رقم السؤال فقط ---- */
+const ptOn=()=>{const e=$('hpt');return !!e&&e.value==='point'};
+const ptWin=dd=>Math.max(.5,Math.min(4,dd*.6));
+function plan(pc,W,H,d){
+  if(!ptOn())return plan0(pc,W,H,d);
+  const P=ptWin(d),r=plan0(pc,W,H,Math.max(.5,d-P));
+  return{S:r.S+P,R:0};
+}
+/* موضع رقم السؤال: أقصى يمين حبر داكن في أعلى القطعة (الأرقام عربية، والنص من اليمين) */
+function numPos(c){
+  if(c._num)return c._num;
+  let r={xc:c.width*.92,yb:c.height*.1};
+  try{
+    const sc=Math.min(1,320/c.width),w=Math.max(1,Math.round(c.width*sc)),h=Math.max(1,Math.round(c.height*sc));
+    const t=document.createElement('canvas');t.width=w;t.height=h;const x=t.getContext('2d',{willReadFrequently:true});
+    x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(c,0,0,w,h);
+    const rows=Math.max(4,Math.round(h*.25)),d=x.getImageData(0,0,w,rows).data;
+    const dark=i=>d[i]<185||d[i+1]<185||d[i+2]<185;
+    let mx=-1;
+    for(let xx=w-1;xx>=0&&mx<0;xx--){
+      let n=0;for(let yy=0;yy<rows;yy++)if(dark((yy*w+xx)*4))n++;
+      if(n>0&&n<rows*.85)mx=xx;   /* تجاهل خط عمودي طويل (إطار) */
+    }
+    if(mx>=0){
+      const x0=Math.max(0,mx-Math.round(w*.08)),rd=[];
+      for(let yy=0;yy<rows;yy++){let a=false;for(let xx=x0;xx<=mx&&!a;xx++)if(dark((yy*w+xx)*4))a=true;rd.push(a)}
+      let y0=rd.indexOf(true);
+      if(y0>=0){
+        let y1=y0,gap=0;
+        for(let yy=y0+1;yy<rows;yy++){if(rd[yy]){y1=yy;gap=0}else if(++gap>2)break}
+        let sx=0,n=0;
+        for(let yy=y0;yy<=y1;yy++)for(let xx=x0;xx<=mx;xx++)if(dark((yy*w+xx)*4)){sx+=xx;n++}
+        r={xc:(sx/Math.max(1,n))/sc,yb:(y1+1)/sc};
+      }
+    }
+  }catch(e){}
+  return c._num=r;
+}
+let lastGeo=null;
+function pointHand(ctx,W,c,g,pr){
+  if(!g||pr>=1||!$('himg').checked)return;
+  const n=numPos(c),x=g.ox+n.xc*g.k,y=g.oy+n.yb*g.k;
+  if(y<g.y0||y>g.y1)return;
+  const slide=Math.max(1-ez(pr/.14),ez((pr-.86)/.14)),jit=Math.sin(pr*60)*W*.0015*(1-slide);
+  /* تأتي اليد من أسفل اليمين وتشير بطرف القلم إلى حافة الرقم السفلية، فلا تغطي سطور السؤال */
+  drawHand(ctx,x+W*.004,y+W*.006,W,{k:'point',slide,flip:true,jit,rot:1.1});
+}
+
+/* ---- انتقال القطع: سحب باليد (دخول/خروج) أو قلب صفحة أو تلاشي ---- */
+const entOf=(pc,d)=>{const e=$('ent');return(!e||e.value==='none')?0:Math.min(.9,d*.25)};
+const ENT_ORDER=['bottom','right','top','left'],TR_ORDER=['slide','pull','flip','fade'];
+let entC=null,entP=null,entPc=null,entPrev=null,entKk='';
+function frameAt(ctx,W,H,pc,e,d,i,S,R,prev){
+  const E=entOf(pc,d),cl=x=>Math.max(0,Math.min(1,x));
+  if(!E||e>=E){
+    const e2=e-E;
+    if(ptOn()){const P=ptWin(d-E),S0=Math.max(0,S-P);frame(ctx,W,H,pc.c,pc.ans,1,pc.k,uOf(pc,Math.max(0,e2-P),S0),cl(e2/P));return}
+    frame(ctx,W,H,pc.c,pc.ans,R?cl((e2-S)/R):1,pc.k,uOf(pc,e2,S));return;
+  }
+  const v=$('ent').value,dir=v==='mixed'?ENT_ORDER[(i+(i>>2))%4]:v;
+  let tr=$('tr').value;if(tr==='mixed')tr=TR_ORDER[i%4];
+  if(!prev&&tr!=='slide')tr='slide';
+  if(!entC||entC.width!==W||entC.height!==H){
+    entC=document.createElement('canvas');entC.width=W;entC.height=H;
+    entP=document.createElement('canvas');entP.width=W;entP.height=H;entPc=null;
+  }
+  const kk=[W,H,pc.ans,pc.k,pc.c.width,pc.c.height,ptOn()].join('|');
+  if(entPc!==pc||entPrev!==prev||entKk!==kk){
+    frame(entC.getContext('2d'),W,H,pc.c,pc.ans,0,pc.k,0);
+    const px=entP.getContext('2d');
+    if(prev)frame(px,W,H,prev.c,prev.ans,1,prev.k,1);else{px.fillStyle='#fff';px.fillRect(0,0,W,H)}
+    entPc=pc;entPrev=prev;entKk=kk;
+  }
+  const p=e/E,hand=$('himg').checked,sway=Math.sin(p*8)*W*.004;
+  const hh=(x,y,flip)=>{if(hand)drawHand(ctx,x,y,W,{k:'hold',slide:0,flip})};
+  const sh=(dx,dy)=>{ctx.shadowColor='rgba(0,0,0,.32)';ctx.shadowBlur=W*.02;ctx.shadowOffsetX=dx;ctx.shadowOffsetY=dy};
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
+  if(tr==='fade'){
+    ctx.drawImage(entP,0,0);ctx.globalAlpha=ez(p);ctx.drawImage(entC,0,0);ctx.globalAlpha=1;return;
+  }
+  if(tr==='flip'){
+    ctx.drawImage(entC,0,0);
+    const a=ez(p),w=Math.max(1,W*Math.cos(a*Math.PI/2)),x0=W-w;
+    ctx.save();sh(-W*.008,0);ctx.drawImage(entP,x0,0,w,H);ctx.restore();
+    const g=ctx.createLinearGradient(x0,0,W,0);g.addColorStop(0,'rgba(0,0,0,'+(.2*a)+')');g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g;ctx.fillRect(x0,0,w,H);
+    hh(x0+W*.03,H*.55+sway,false);return;
+  }
+  if(tr==='pull'){
+    const t=ez(p);let ox=0,oy=0;
+    if(dir==='bottom')oy=t*H;else if(dir==='top')oy=-t*H;else if(dir==='right')ox=t*W;else ox=-t*W;
+    ctx.drawImage(entC,0,0);
+    ctx.save();sh(dir==='right'?W*.006:dir==='left'?-W*.006:0,dir==='bottom'?W*.006:dir==='top'?-W*.006:0);
+    ctx.drawImage(entP,ox,oy);ctx.restore();
+    /* اليد تدفع القطعة القديمة من حافتها الخلفية فتبقى ظاهرة طوال الحركة */
+    if(dir==='bottom')hh(ox+W*.58,oy+H*.05+sway,false);
+    else if(dir==='top')hh(ox+W*.58,oy+H-H*.05+sway,false);
+    else if(dir==='right')hh(ox+W*.04,H*.5+sway,false);
+    else hh(ox+W-W*.04,H*.5+sway,true);
+    return;
+  }
+  const t=1-Math.pow(1-p,3);let ox=0,oy=0;
+  if(dir==='bottom')oy=(1-t)*H;else if(dir==='top')oy=-(1-t)*H;else if(dir==='right')ox=(1-t)*W;else ox=-(1-t)*W;
+  ctx.drawImage(entP,0,0);
+  ctx.save();sh(dir==='right'?-W*.006:dir==='left'?W*.006:0,dir==='bottom'?-W*.006:dir==='top'?W*.006:0);
+  ctx.drawImage(entC,ox,oy);ctx.restore();
+  if(dir==='bottom')hh(ox+W*.58,oy+H*.05+sway,false);
+  else if(dir==='top')hh(ox+W*.58,oy+H-H*.05+sway,false);
+  else if(dir==='right')hh(ox+W*.04,H*.5+sway,false);
+  else hh(ox+W-W*.04,H*.5+sway,true);
+}
+/* صوت سحب الورقة: ضجيج مفلتَر يُولَّد برمجياً ويُدمج في مسار الصوت */
+function addSwoosh(a,sr,t0,g){
+  const n=Math.floor(sr*.5),o=Math.floor(t0*sr);let l1=0,l2=0;
+  for(let i=0;i<n&&o+i<a.length;i++){
+    const x=i/n,env=Math.pow(Math.sin(Math.PI*Math.pow(x,.6)),2),k=.03+.45*Math.sin(Math.PI*x);
+    l1+=k*((Math.random()*2-1)-l1);l2+=k*(l1-l2);
+    a[o+i]+=(l1-l2)*env*g;
+  }
+}
 /* إطار بكاميرا: تبدأ من الصفحة كاملة، تكبّر وتتبع القلم، ثم تعود للصفحة كاملة */
 function camFrame(ctx,W,H,c,L,r){
   const m=L.m;let k0,ox0,oy0;
@@ -1109,8 +1237,9 @@ function inkHand(ctx,W,c,g,ratio){
     pos-=l;
   }
 }
-function frame(ctx,W,H,c,ans,ratio=1,k='',u=0){
-  if(c._full)return frameFull(ctx,W,H,c._full,ans,ratio,k);
+function frame(ctx,W,H,c,ans,ratio=1,k='',u=0,pr=1){
+  if(c._full)return frameFull(ctx,W,H,c._full,ans,ptOn()?1:ratio,k);
+  const PT=ptOn();if(PT)ratio=1;
   const T=(k==='g'?'✓ ':k==='r'?'✗ ':'')+(ans||'');
   ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
   const uIn=u,on=!!ans&&$('hand').checked,L=layout(c,W,H,on),m=L.m,zh=L.zh;let geo=null;
@@ -1118,7 +1247,7 @@ function frame(ctx,W,H,c,ans,ratio=1,k='',u=0){
   if(!on&&ratio<1&&camOn(c)){camFrame(ctx,W,H,c,L,ratio);return}
   if(L.sc){
     const dw=c.width*L.wS,wh=zh-2*m,mo=c.height*L.wS-wh;
-    if(!on&&mo>0&&hasScrollHand(c))u=Math.max(0,Math.min(1,(scrollY(c,u)*L.wS-wh*.42)/mo));
+    if(!on&&!PT&&mo>0&&hasScrollHand(c))u=Math.max(0,Math.min(1,(scrollY(c,u)*L.wS-wh*.42)/mo));
     const off=u*mo,u0=u;geo={ox:(W-dw)/2,oy:m-off,k:L.wS,y0:m,y1:m+wh};
     ctx.drawImage(c,0,off/L.wS,c.width,wh/L.wS,(W-dw)/2,m,dw,wh);
   }else{
@@ -1126,7 +1255,7 @@ function frame(ctx,W,H,c,ans,ratio=1,k='',u=0){
     const oy=on?m+(zh-2*m-dh)/2:(H-dh)/2;geo={ox:(W-dw)/2,oy,k:s,y0:-1e9,y1:1e9};
     ctx.drawImage(c,(W-dw)/2,oy,dw,dh);
   }
-  if(!on){if(geo&&L.sc&&hasScrollHand(c))scrollHand(ctx,W,c,geo,uIn);else if(geo&&ratio<1&&hasInkHand(c))inkHand(ctx,W,c,geo,ratio);return}
+  if(!on){if(PT){pointHand(ctx,W,c,geo,pr);return}if(geo&&L.sc&&hasScrollHand(c))scrollHand(ctx,W,c,geo,uIn);else if(geo&&ratio<1&&hasInkHand(c))inkHand(ctx,W,c,geo,ratio);return}
   const aw=W-2*m,ah=H-zh-m;
   ctx.strokeStyle='#c9d3ea';ctx.lineWidth=Math.max(1,W/640);ctx.beginPath();ctx.moveTo(m,zh);ctx.lineTo(W-m,zh);ctx.stroke();
   ctx.direction='rtl';ctx.textAlign='right';ctx.textBaseline='top';ctx.fillStyle=k==='g'?'#157a3d':k==='r'?'#c0261f':'#1b3fa0';
@@ -1140,6 +1269,7 @@ function frame(ctx,W,H,c,ans,ratio=1,k='',u=0){
     if(f>0&&f<1){px=W-m-vis;py=y+fs*.95}
     pos-=wi;y+=fs*1.45;if(pos<=0)break;
   }
+  if(PT){pointHand(ctx,W,c,geo,pr);return}
   if(px!==null&&ratio<1&&!k&&$('himg').checked&&drawHand(ctx,px,py,W,ratio))return;
   if(px!==null&&ratio<1){
     const L=fs*1.3,dx=L*.57,dy=-L*.82;
@@ -1203,11 +1333,11 @@ async function fastMake(sel,W,H){
   const cv=document.createElement('canvas');cv.width=W;cv.height=H;const ctx=cv.getContext('2d');
   const total=sel.reduce((a,p)=>a+dur(p),0);let t=0,n=0;
   for(let i=0;i<sel.length;i++){
-    const pc=sel[i],d=dur(pc),{S,R}=plan(pc,W,H,d);
+    const pc=sel[i],d=dur(pc),E=entOf(pc,d),{S,R}=plan(pc,W,H,d-E);
     for(let k=0;k<d;){
       chk();
-      const len=Math.min(k<S+R?.1:1,d-k),e=k+len;
-      frame(ctx,W,H,pc.c,pc.ans,R?Math.min(1,Math.max(0,(e-S)/R)):1,pc.k,uOf(pc,e,S));
+      const len=Math.min(k<E+S+R?.1:1,d-k),e=k+len;
+      frameAt(ctx,W,H,pc,e,d,i,S,R,sel[i-1]);
       const vf=new VideoFrame(cv,{timestamp:Math.round((t+k)*1e6),duration:Math.round(len*1e6)});
       ve.encode(vf,{keyFrame:k===0||n%8===0});vf.close();n++;k+=len;
       while(ve.encodeQueueSize>8&&!err){chk();await new Promise(r=>setTimeout(r,5))}
@@ -1285,12 +1415,12 @@ async function makeOne(sel,name){
   const stopped=new Promise(r=>rec.onstop=r);
   const total=sel.reduce((a,p)=>a+dur(p),0)*1000,t0=performance.now();
   rec.start(1000);if(src)src.start();
-  for(const pc of sel){
-    const st=performance.now(),d=dur(pc),end=st+d*1000,{S,R}=plan(pc,W,H,d);
+  for(const [i,pc] of sel.entries()){
+    const st=performance.now(),d=dur(pc),end=st+d*1000,{S,R}=plan(pc,W,H,d-entOf(pc,d));
     while(performance.now()<end){
       if(cancel){try{rec.stop()}catch(x){}if(src){try{src.stop()}catch(x){}}if(ac)ac.close();throw CANCEL}
       const e=(performance.now()-st)/1000;
-      frame(ctx,W,H,pc.c,pc.ans,R?Math.min(1,Math.max(0,(e-S)/R)):1,pc.k,uOf(pc,e,S));
+      frameAt(ctx,W,H,pc,e,d,i,S,R,sel[i-1]);
       const done=performance.now()-t0;
       $('bar').firstChild.style.width=Math.min(100,done/total*100)+'%';
       $('st').textContent='جارٍ التسجيل... متبقٍ حوالي '+Math.max(0,Math.ceil((total-done)/1000))+' ثانية. لا تغلق هذه الصفحة.';
@@ -1905,13 +2035,13 @@ $('upd').onclick=()=>location.reload();
     paused=false;$('pvp').textContent='إيقاف مؤقت';const my=++run;
     if(!dlg.open)dlg.showModal();
     for(let i=0;i<sel.length;i++){
-      const pc=sel[i],d=dur(pc),{S,R}=plan(pc,W,H,d);let e=0,last=performance.now();
+      const pc=sel[i],d=dur(pc),{S,R}=plan(pc,W,H,d-entOf(pc,d));let e=0,last=performance.now();
       const before=sel.slice(0,i).reduce((a,p)=>a+dur(p),0);
       while(e<d){
         if(my!==run)return;
         const now=performance.now(),dt=(now-last)/1000;last=now;
         if(!paused)e+=dt*(+$('pvs').value);
-        frame(ctx,W,H,pc.c,pc.ans,R?Math.min(1,Math.max(0,(e-S)/R)):1,pc.k,uOf(pc,e,S));
+        frameAt(ctx,W,H,pc,e,d,i,S,R,sel[i-1]);
         $('pvb').firstChild.style.width=Math.min(100,(before+Math.min(e,d))/total*100)+'%';
         $('pvt').textContent='معاينة: القطعة '+(i+1)+' من '+sel.length+' ('+pc.label+')'+(pc.ans?'':' — بلا إجابة');
         await new Promise(r=>setTimeout(r,50));
@@ -1939,7 +2069,7 @@ function bulkInfo(){
   $('bpengo').onclick=()=>{if(!need())return;const k=$('bpen').value;sel().forEach(p=>p.k=k);draw()};
 
   /* القوالب */
-  const KEY='vt-templates',IDS=['parts','sens','enh','sec','res','br','fast','hand','scr','autod','amode','lowmem','r169'];
+  const KEY='vt-templates',IDS=['parts','sens','enh','sec','res','br','fast','hand','scr','autod','amode','lowmem','r169','hpt','tr','ent','sfx'];
   const rd=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'{}')||{}}catch(_){return{}}};
   const wr=o=>{try{localStorage.setItem(KEY,JSON.stringify(o));return true}catch(_){return false}};
   const el=id=>$(id),st=m=>{$('tplst').textContent=m};
