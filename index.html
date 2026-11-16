@@ -359,6 +359,16 @@ dialog#ed,dialog#rs{max-height:92vh;max-height:92dvh}
   </div>
 </dialog>
 
+<dialog id="hld" aria-label="تظليل أجزاء من القطعة">
+  <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px"><b>🖍 تظليل أجزاء من القطعة</b><span><button id="hlok">تم</button> <button id="hlcx" class="alt">إلغاء</button></span></div>
+  <div class="row" style="gap:6px;align-items:center">
+    <button class="sm" id="hlr">🖍 تظليل منطقة</button><button class="alt sm" id="hll">〰 خط</button>
+    <span id="hlcols" style="display:inline-flex;gap:6px"></span>
+    <button class="alt sm" id="hlun">↩ تراجع</button><button class="alt sm" id="hlclr">مسح الكل</button>
+  </div>
+  <p class="note" id="hli">اسحب بإصبعك على الصورة لتحديد جزء. اليد ستظلله بالترتيب في الفيديو.</p>
+  <div style="overflow:auto;max-height:68vh"><canvas id="hlc" style="touch-action:none;width:100%;border:1px solid var(--line);display:block"></canvas></div>
+</dialog>
 <dialog id="pw" aria-label="تنبيهات قبل الفيديو">
   <b>تنبيهات قبل إنشاء الفيديو</b>
   <div id="pwl" style="margin:10px 0;max-height:55vh;overflow:auto"></div>
@@ -858,7 +868,7 @@ $('pord').onchange=()=>{
 try{const m=localStorage.getItem('vt-pord');if(m==='auto'||m==='manual')$('pord').value=m}catch(e){}
 function mv(i,k){snap();const j=i+k;[pieces[i],pieces[j]]=[pieces[j],pieces[i]];setPord('manual');draw()}
 function draw(){
-  const g=$('grid');g.innerHTML='';pieces.forEach(p=>{p.c._sm=p.sm||'';p.c._pm=p.pm?1:0});
+  const g=$('grid');g.innerHTML='';pieces.forEach(p=>{p.c._sm=p.sm||'';p.c._pm=p.pm?1:0;p.c._hl=p.hl&&p.hl.length?p.hl:null});
   pieces.forEach((pc,i)=>{
     const d=document.createElement('div');d.className='th'+(pc.keep?'':' off');
     const v=document.createElement('canvas');v.width=320;v.height=180;frame(v.getContext('2d'),320,180,pc.c,pc.ans,1,pc.k,pc.u||0);
@@ -870,7 +880,7 @@ function draw(){
     const inp=document.createElement('input');inp.type='number';inp.min=1;inp.max=300;inp.placeholder=dur(Object.assign({},pc,{d:0}));inp.value=pc.d||'';inp.title='مدة هذه القطعة بالثواني';inp.setAttribute('aria-label','مدة هذه القطعة بالثواني');
     inp.oninput=()=>{pc.d=+inp.value||0;updTot()};
     t.append(mk('→','قدّم القطعة',()=>mv(i,-1),i==0),mk('←','أخّر القطعة',()=>mv(i,1),i==pieces.length-1),
-      mk('✂','قسّم القطعة نصفين',()=>split(i)),mk('دمج','ادمج مع التالية',()=>merge(i),i==pieces.length-1),mk('📐','غيّر أبعاد القطعة (يُحفظ الأصل)',()=>openRs([pc]),!!pc.c._full),mk('🗑','احذف القطعة نهائياً (يمكن التراجع)',()=>delPieces([pc])),inp,...auBtns(pc,mk));
+      mk('✂','قسّم القطعة نصفين',()=>split(i)),mk('دمج','ادمج مع التالية',()=>merge(i),i==pieces.length-1),mk('📐','غيّر أبعاد القطعة (يُحفظ الأصل)',()=>openRs([pc]),!!pc.c._full),mk('🖍'+(pc.hl&&pc.hl.length?pc.hl.length:''),'تظليل أجزاء من القطعة (تظلّلها اليد في الفيديو)',()=>openHl(pc),!!pc.c._full),mk('🗑','احذف القطعة نهائياً (يمكن التراجع)',()=>delPieces([pc])),inp,...auBtns(pc,mk));
     const ta=document.createElement('textarea');ta.rows=2;ta.placeholder='الإجابة (اكتبها أو عدّلها)';ta.setAttribute('aria-label','الإجابة: '+pc.label);ta.value=pc.ans||'';
     ta.style.cssText='width:100%;margin-top:6px;font:inherit;font-size:.85rem;border:1px solid var(--line);border-radius:6px;padding:4px;background:transparent;color:inherit';
     ta.oninput=()=>{pc.ans=ta.value;pc.chk='';pc.lib=false;updTot()};ta.onchange=()=>frame(v.getContext('2d'),320,180,pc.c,pc.ans,1,pc.k,pc.u||0);
@@ -995,7 +1005,7 @@ function drawHand(ctx,x,y,W,r){
   if(!H.write.i.complete||!H.write.i.naturalWidth)return false;
   const f=W*.15/H.write.w;
   let slide=0,wp=0,ww=1,wh=0,jit=0,flip=false;
-  if(r&&typeof r==='object'){slide=r.slide||0;flip=!!r.flip;jit=r.jit||0;ww=0;if(r.k==='hold')wh=1;else wp=1}
+  if(r&&typeof r==='object'){slide=r.slide||0;flip=!!r.flip;jit=r.jit||0;ww=0;if(r.k==='hold')wh=1;else if(r.k==='write')ww=1;else wp=1}
   else if(typeof r==='number'){
     r=Math.max(0,Math.min(1,r));
     const cf=ez((r-.055)/.025),hw=ez((r-.94)/.02);
@@ -1094,6 +1104,7 @@ const ptOn=()=>{const e=$('hpt');return !!e&&e.value==='point'};
 const ptWin=dd=>Math.max(.5,Math.min(4,dd*.6));
 function plan(pc,W,H,d){
   if(!ptOn())return plan0(pc,W,H,d);
+  if(hlOn(pc)){const tl=buildTL(pc,W,H,d);return{S:tl.total,R:0}}
   const P=ptWin(d),r=plan0(pc,W,H,Math.max(.5,d-P));
   return{S:r.S+P,R:0};
 }
@@ -1153,13 +1164,117 @@ function pointHand(ctx,W,c,g,pr,hd){
     const t=ez((pr-.86)/.14),x=lerp(nx,gx,t),y=lerp(nvis?ny:yb,yb,t);
     pt(x,y,0,0,1-t);hold(x,y,t);return;
   }
+  const hs=hd.st&&hd.st.hand;
+  if(hs&&(hs.type==='hl'||hs.type==='appr')){markHand(ctx,W,c,g,hs,gx,yb);return}
   let y=yb,a=1;
   if(hd.n>0){
     const sN=Math.min(Math.max(hd.u,0),1)*hd.n,i=Math.min(hd.n-1,Math.floor(sN)),f=sN-i;
     if(f<.72)y=yb-hd.dD*ez(f/.72);
-    else{y=yb-hd.dD+hd.dD*ez((f-.72)/.28);a=.8}
+    else{y=yb-hd.dD+hd.dD*ez((f-.72)/.28);a=f>=.999?1:.8}
   }
   hold(gx,y,a);
+}
+
+/* ---- التظليل: يحدده المستخدم في شاشة التعديل وترسمه اليد في الفيديو ---- */
+const HL_COLS=['#ffe14d','#8be58f','#ff9ecb','#ff8a80'];
+const hlOn=pc=>!!(ptOn()&&$('hal')&&$('hal').checked&&$('himg')&&$('himg').checked&&pc.c&&!pc.c._full&&pc.c._hl&&pc.c._hl.length);
+function markInfo(c,g,mk){
+  const cw=c.width*g.k,ch=c.height*g.k,X=v=>g.ox+v*cw,Y=v=>g.oy+v*ch;
+  if(mk.t==='l'){const a={x:X(mk.x0),y:Y(mk.y0)},b={x:X(mk.x1),y:Y(mk.y1)};return{t:'l',a,b,flip:b.x<a.x,lw:Math.max(3,cw*.011)}}
+  const X0=X(Math.min(mk.x0,mk.x1)),X1=X(Math.max(mk.x0,mk.x1)),Y0=Y(Math.min(mk.y0,mk.y1)),Y1=Y(Math.max(mk.y0,mk.y1));
+  const nb=Math.max(1,Math.ceil((Y1-Y0)/(cw*.035)-.15)),bh=(Y1-Y0)/nb;
+  return{t:'r',X0,X1,Y0,Y1,nb,bh,flip:true};
+}
+function markTipAt(mi,p){
+  if(mi.t==='l')return{x:mi.a.x+(mi.b.x-mi.a.x)*p,y:mi.a.y+(mi.b.y-mi.a.y)*p};
+  const w=mi.X1-mi.X0,s=Math.min(.9999,Math.max(0,p))*mi.nb,j=Math.floor(s),f=s-j;
+  return{x:mi.X1-f*w,y:mi.Y0+(j+.5)*mi.bh};
+}
+function paintMark(ctx,c,g,mk,p){
+  const mi=markInfo(c,g,mk);
+  ctx.save();
+  if(mi.t==='l'){
+    const e=markTipAt(mi,p);
+    ctx.globalAlpha=.92;ctx.strokeStyle=mk.col;ctx.lineWidth=mi.lw;ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(mi.a.x,mi.a.y);ctx.lineTo(e.x,e.y);ctx.stroke();
+  }else{
+    const w=mi.X1-mi.X0,s=Math.min(1,p)*mi.nb;
+    ctx.globalCompositeOperation='multiply';ctx.fillStyle=mk.col;   /* الضرب يُبقي النص مقروءاً تحت اللون */
+    for(let j=0;j<mi.nb;j++){const f=Math.max(0,Math.min(1,s-j));if(f<=0)break;ctx.fillRect(mi.X1-f*w,mi.Y0+j*mi.bh,f*w,mi.bh)}
+  }
+  ctx.restore();
+}
+/* st=null: كل العلامات مرسومة كاملة (معاينة ثابتة)؛ وإلا حسب تقدم الخطة الزمنية */
+function drawMarks(ctx,c,g,st){
+  const hl=c._hl;if(!hl||!hl.length||!g)return;
+  ctx.save();
+  if(g.y0>-1e8){ctx.beginPath();ctx.rect(0,g.y0,ctx.canvas.width,g.y1-g.y0);ctx.clip()}
+  hl.forEach((mk,i)=>{const p=!st?1:st.done[i]?1:(st.cur===i?st.pp:0);if(p>0)paintMark(ctx,c,g,mk,p)});
+  ctx.restore();
+}
+function markHand(ctx,W,c,g,hs,gx,yb){
+  const hl=c._hl,cl=x=>Math.max(0,Math.min(1,x));
+  const dw=(x,y,flip,a)=>{ctx.save();ctx.globalAlpha=a;drawHand(ctx,x,y,W,{k:'write',slide:0,flip});ctx.restore()};
+  const dh=(x,y,a)=>{ctx.save();ctx.globalAlpha=a;drawHand(ctx,x,y,W,{k:'hold',slide:0,flip:true});ctx.restore()};
+  if(hs.type==='hl'){
+    const mi=markInfo(c,g,hl[hs.idx]),f=hs.f;
+    const from=hs.prev>=0?markTipAt(markInfo(c,g,hl[hs.prev]),1):{x:gx,y:yb};
+    if(f<.2){
+      const t=ez(f/.2),s0=markTipAt(mi,0),x=from.x+(s0.x-from.x)*t,y=from.y+(s0.y-from.y)*t;
+      if(hs.prev<0){dh(x,y,1-t);dw(x,y,mi.flip,t)}else dw(x,y,mi.flip,1);
+    }else{const tp=markTipAt(mi,cl((f-.2)/.8));dw(tp.x,tp.y,mi.flip,1)}
+  }else{
+    const mi=markInfo(c,g,hl[hs.prev]),e=markTipAt(mi,1),t=ez(hs.f),x=e.x+(gx-e.x)*t,y=e.y+(yb-e.y)*t;
+    dw(x,y,mi.flip,1-t);dh(x,y,t);
+  }
+}
+/* خطة زمنية للقطعة التي عليها علامات: إشارة ← (تظليل علامات المكان الحالي ← سحبة) × عدد المحطات */
+function scrollInfo(c,W,H,on){
+  const L=layout(c,W,H,on);
+  if(!L.sc)return{n:0,dD:0,mo:0,wh:0,L};
+  const wh=L.zh-2*L.m,mo=c.height*L.wS-wh;
+  if(mo<=0)return{n:0,dD:0,mo:0,wh,L};
+  const n=Math.max(1,Math.ceil(mo/(.45*wh)));
+  return{n,dD:mo/n,mo,wh,L};
+}
+function buildTL(pc,W,H,d){
+  const c=pc.c,hl=c._hl,on=!!pc.ans&&$('hand').checked;
+  const key=[W,H,d.toFixed(3),on,JSON.stringify(hl)].join('|');
+  if(c._tl&&c._tl.key===key)return c._tl;
+  const si=scrollInfo(c,W,H,on),L=si.L,P=ptWin(d),R0=Math.max(.5,d-P);
+  const stopOf=hl.map(mk=>{
+    if(!si.n)return 0;
+    const top=Math.min(mk.y0,mk.y1)*c.height*L.wS,bot=Math.max(mk.y0,mk.y1)*c.height*L.wS;
+    for(let s=0;s<=si.n;s++){const off=s*si.dD;if(top>=off-2&&bot<=off+si.wh+2)return s}
+    return Math.min(si.n,Math.max(0,Math.floor(top/si.dD)));
+  });
+  const nm=hl.length,ns=new Set(stopOf).size;
+  const Tm=Math.max(.35,Math.min(2,(.6*R0-ns*.3)/nm)),Mt=nm*Tm+ns*.3;
+  const ST=si.n?plan0(pc,W,H,Math.max(.5,R0-Mt)).S:0,sd=si.n?ST/si.n:0;
+  const segs=[];let t=P;
+  for(let s=0;s<=si.n;s++){
+    const ms=[];stopOf.forEach((st,i)=>{if(st===s)ms.push(i)});
+    let prev=-1;
+    ms.forEach(i=>{segs.push({type:'hl',t0:t,t1:t+Tm,idx:i,prev});t+=Tm;prev=i});
+    if(ms.length){segs.push({type:'appr',t0:t,t1:t+.3,prev});t+=.3}
+    if(s<si.n){segs.push({type:'stroke',t0:t,t1:t+sd,i:s});t+=sd}
+  }
+  const n=si.n,cl=x=>Math.max(0,Math.min(1,x));
+  const at=tm=>{
+    const st={pr:Math.min(1,tm/P),u:0,done:{},cur:-1,pp:0,hand:null};
+    if(tm<P)return st;
+    let uc=0;
+    for(const sg of segs){
+      if(tm>=sg.t1){if(sg.type==='hl')st.done[sg.idx]=1;else if(sg.type==='stroke')uc=(sg.i+1)/n;continue}
+      const f=cl((tm-sg.t0)/Math.max(1e-6,sg.t1-sg.t0));
+      if(sg.type==='hl'){st.cur=sg.idx;st.pp=cl((f-.2)/.8);st.hand={type:'hl',idx:sg.idx,prev:sg.prev,f}}
+      else if(sg.type==='appr')st.hand={type:'appr',prev:sg.prev,f};
+      else uc=(sg.i+f)/n;
+      st.u=uc;return st;
+    }
+    st.u=n?1:0;return st;
+  };
+  return c._tl={key,total:t,at};
 }
 
 /* ---- انتقال القطع: سحب باليد (دخول/خروج) أو قلب صفحة أو تلاشي ---- */
@@ -1170,6 +1285,7 @@ function frameAt(ctx,W,H,pc,e,d,i,S,R,prev){
   const E=entOf(pc,d),cl=x=>Math.max(0,Math.min(1,x));
   if(!E||e>=E){
     const e2=e-E;
+    if(hlOn(pc)){const st=buildTL(pc,W,H,d-E).at(e2);frame(ctx,W,H,pc.c,pc.ans,1,pc.k,st.u,st.pr,true,st);return}
     if(ptOn()){const P=ptWin(d-E),S0=Math.max(0,S-P);frame(ctx,W,H,pc.c,pc.ans,1,pc.k,uOf(pc,Math.max(0,e2-P),S0),cl(e2/P),true);return}
     frame(ctx,W,H,pc.c,pc.ans,R?cl((e2-S)/R):1,pc.k,uOf(pc,e2,S));return;
   }
@@ -1180,9 +1296,9 @@ function frameAt(ctx,W,H,pc,e,d,i,S,R,prev){
     entC=document.createElement('canvas');entC.width=W;entC.height=H;
     entP=document.createElement('canvas');entP.width=W;entP.height=H;entPc=null;
   }
-  const kk=[W,H,pc.ans,pc.k,pc.c.width,pc.c.height,ptOn()].join('|');
+  const kk=[W,H,pc.ans,pc.k,pc.c.width,pc.c.height,ptOn(),hlOn(pc)].join('|');
   if(entPc!==pc||entPrev!==prev||entKk!==kk){
-    frame(entC.getContext('2d'),W,H,pc.c,pc.ans,0,pc.k,0);
+    frame(entC.getContext('2d'),W,H,pc.c,pc.ans,0,pc.k,0,1,false,hlOn(pc)?{done:{},cur:-1,pp:0}:null);
     const px=entP.getContext('2d');
     if(prev)frame(px,W,H,prev.c,prev.ans,1,prev.k,1);else{px.fillStyle='#fff';px.fillRect(0,0,W,H)}
     entPc=pc;entPrev=prev;entKk=kk;
@@ -1265,7 +1381,7 @@ function inkHand(ctx,W,c,g,ratio){
     pos-=l;
   }
 }
-function frame(ctx,W,H,c,ans,ratio=1,k='',u=0,pr=1,hd=false){
+function frame(ctx,W,H,c,ans,ratio=1,k='',u=0,pr=1,hd=false,st=null){
   if(c._full)return frameFull(ctx,W,H,c._full,ans,ptOn()?1:ratio,k);
   const PT=ptOn();if(PT)ratio=1;
   const HAL=PT&&hd&&!!$('hal')&&$('hal').checked&&$('himg').checked;let HD=null;
@@ -1280,7 +1396,7 @@ function frame(ctx,W,H,c,ans,ratio=1,k='',u=0,pr=1,hd=false){
     if(HAL){
       /* الصفحة تتحرك فقط أثناء سحبة اليد (72% من كل دورة) وتثبت أثناء رجوع اليد لأسفل */
       const n=mo>0?Math.max(1,Math.ceil(mo/(.45*wh))):0;
-      HD={u,n,dD:n?mo/n:0,yb:m+wh*.78};
+      HD={u,n,dD:n?mo/n:0,yb:m+wh*.78,st};
       if(n){const sN=Math.min(Math.max(u,0),1)*n,i=Math.min(n-1,Math.floor(sN)),f=sN-i;u=(i+ez(Math.min(1,f/.72)))/n}
     }
     const off=u*mo,u0=u;geo={ox:(W-dw)/2,oy:m-off,k:L.wS,y0:m,y1:m+wh};
@@ -1288,9 +1404,10 @@ function frame(ctx,W,H,c,ans,ratio=1,k='',u=0,pr=1,hd=false){
   }else{
     const s=Math.min((W-2*m)/refW(c),(zh-2*m)/refH(c),(W-2*m)/c.width,(zh-2*m)/c.height,2.2),dw=c.width*s,dh=c.height*s;
     const oy=on?m+(zh-2*m-dh)/2:(H-dh)/2;geo={ox:(W-dw)/2,oy,k:s,y0:-1e9,y1:1e9};
-    if(HAL)HD={u:1,n:0,dD:0,yb:zh*.8};
+    if(HAL)HD={u:1,n:0,dD:0,yb:zh*.8,st};
     ctx.drawImage(c,(W-dw)/2,oy,dw,dh);
   }
+  drawMarks(ctx,c,geo,st);
   if(!on){if(PT){pointHand(ctx,W,c,geo,pr,HD);return}if(geo&&L.sc&&hasScrollHand(c))scrollHand(ctx,W,c,geo,uIn);else if(geo&&ratio<1&&hasInkHand(c))inkHand(ctx,W,c,geo,ratio);return}
   const aw=W-2*m,ah=H-zh-m;
   ctx.strokeStyle='#c9d3ea';ctx.lineWidth=Math.max(1,W/640);ctx.beginPath();ctx.moveTo(m,zh);ctx.lineTo(W-m,zh);ctx.stroke();
@@ -2380,6 +2497,50 @@ let openRs;
     if(!l.length){$('bulkn').textContent='حدّد قطعة واحدة على الأقل أولاً';return}
     openRs(l);
   };
+})();
+
+/* ---- شاشة التظليل ---- */
+let hlPc=null,hlMarks=[],hlTool='r',hlCol=HL_COLS[0],hlDrag=null,hlK=1,hlRaf=0;
+function hlRender(){
+  const cv=$('hlc'),x=cv.getContext('2d'),c=hlPc.c,g={ox:0,oy:0,k:hlK};
+  x.clearRect(0,0,cv.width,cv.height);x.drawImage(c,0,0,cv.width,cv.height);
+  hlMarks.forEach(m=>paintMark(x,c,g,m,1));
+  if(hlDrag)paintMark(x,c,g,Object.assign({t:hlTool,col:hlCol},hlDrag),1);
+}
+function hlTools(){
+  $('hlr').className=hlTool==='r'?'sm':'alt sm';$('hll').className=hlTool==='l'?'sm':'alt sm';
+  [...$('hlcols').children].forEach(b=>{b.style.outline=b.dataset.c===hlCol?'3px solid var(--acc)':'1px solid var(--line)'});
+  $('hlun').disabled=!hlMarks.length;$('hlclr').disabled=!hlMarks.length;
+  $('hli').textContent=hlMarks.length?hlMarks.length+' علامة. اليد ستظلّلها بنفس ترتيب رسمها.':'اسحب بإصبعك على الصورة لتحديد جزء. اليد ستظلله بالترتيب في الفيديو.';
+}
+function openHl(pc){
+  hlPc=pc;hlMarks=(pc.hl||[]).map(m=>Object.assign({},m));hlTool='r';hlCol=HL_COLS[0];hlDrag=null;
+  const cv=$('hlc'),maxW=Math.min(1100,Math.max(300,innerWidth-60));
+  hlK=Math.min(1,maxW/pc.c.width,6000/pc.c.height);
+  cv.width=Math.max(1,Math.round(pc.c.width*hlK));cv.height=Math.max(1,Math.round(pc.c.height*hlK));
+  $('hlcols').innerHTML='';
+  HL_COLS.forEach(col=>{const b=document.createElement('button');b.type='button';b.dataset.c=col;b.setAttribute('aria-label','لون '+col);
+    b.style.cssText='width:34px;height:34px;border-radius:50%;padding:0;background:'+col;b.onclick=()=>{hlCol=col;hlTools()};$('hlcols').append(b)});
+  hlTools();hlRender();$('hld').showModal();
+}
+(function(){
+  const cv=$('hlc');if(!cv)return;
+  const pos=e=>{const r=cv.getBoundingClientRect();return{x:Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)),y:Math.max(0,Math.min(1,(e.clientY-r.top)/r.height))}};
+  cv.addEventListener('pointerdown',e=>{e.preventDefault();cv.setPointerCapture(e.pointerId);const p=pos(e);hlDrag={x0:p.x,y0:p.y,x1:p.x,y1:p.y}});
+  cv.addEventListener('pointermove',e=>{if(!hlDrag)return;const p=pos(e);hlDrag.x1=p.x;hlDrag.y1=p.y;if(!hlRaf)hlRaf=requestAnimationFrame(()=>{hlRaf=0;hlRender()})});
+  const end=()=>{
+    if(!hlDrag)return;const d=hlDrag;hlDrag=null;
+    const dx=Math.abs(d.x1-d.x0),dy=Math.abs(d.y1-d.y0),ar=hlPc.c.height/hlPc.c.width;
+    const ok=hlTool==='r'?(dx>.015&&dy*ar>.004):(Math.hypot(dx,dy*ar)>.02);
+    if(ok&&hlMarks.length<40)hlMarks.push({t:hlTool,col:hlCol,x0:d.x0,y0:d.y0,x1:d.x1,y1:d.y1});
+    hlTools();hlRender();
+  };
+  cv.addEventListener('pointerup',end);cv.addEventListener('pointercancel',end);
+  $('hlr').onclick=()=>{hlTool='r';hlTools()};$('hll').onclick=()=>{hlTool='l';hlTools()};
+  $('hlun').onclick=()=>{hlMarks.pop();hlTools();hlRender()};
+  $('hlclr').onclick=()=>{hlMarks=[];hlTools();hlRender()};
+  $('hlok').onclick=()=>{hlPc.hl=hlMarks.length?hlMarks:null;hlPc.c._hl=hlPc.hl;$('hld').close();draw();updTot()};
+  $('hlcx').onclick=()=>$('hld').close();
 })();
 </script>
 </body>
