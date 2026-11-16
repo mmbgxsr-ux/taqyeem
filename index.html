@@ -422,6 +422,7 @@ dialog#ed,dialog#rs,dialog#hd{max-height:92vh;max-height:92dvh}
     <label style="flex:1">تقدّم الكتابة <span id="hdrv">35%</span><input type="range" id="hdr" min="0" max="99" value="35"></label>
     <button id="hdp" class="alt sm">▶ تشغيل</button>
   </div>
+  <div class="row" style="margin-top:4px"><button class="alt sm" id="hdj1">👉 الإشارة</button><button class="alt sm" id="hdj2">🖍 التظليل</button><button class="alt sm" id="hdj3">✋ الوقوف</button></div>
   <div class="row" style="margin-top:6px">
     <label>تدوير اليد <span id="hdrotv">0°</span><input type="range" id="hdrot" min="-60" max="60" value="0"></label>
     <label>حجم اليد <span id="hdszv">100%</span><input type="range" id="hdsz" min="50" max="180" value="100"></label>
@@ -797,7 +798,8 @@ function openHand(pc){
   function paint(){
     pend=0;if(done)return;pc.c._hand=norm();
     const r=ratio(),on=!!pc.ans&&$('hand').checked;
-    frame(cx,cv.width,cv.height,pc.c,pc.ans,Math.min(.995,r),pc.k,pc.c._pm?r:(pc.u||0));
+    const W=cv.width,H=cv.height,d=dur(pc),E=entOf(pc,d),pl=plan(pc,W,H,d-E),T=pl.S+pl.R;
+    frameAt(cx,W,H,pc,E+Math.min(.995,r)*T,d,0,pl.S,pl.R,null);
     $('hdrv').textContent=Math.round(r*100)+'%';$('hdrotv').textContent=Math.round(+h.rot||0)+'°';$('hdszv').textContent=Math.round((h.sz||1)*100)+'%';
   }
   const req=()=>{if(!pend){pend=1;requestAnimationFrame(paint)}};
@@ -812,6 +814,11 @@ function openHand(pc){
   $('hdflip').onchange=()=>{h.flip=$('hdflip').checked;req()};
   $('hdoff').onchange=()=>{h.off=$('hdoff').checked;req()};
   $('hdr').oninput=()=>{stop();req()};
+  const jump=k=>{stop();const W=cv.width,H=cv.height,d=dur(pc),E=entOf(pc,d),pl=plan(pc,W,H,d-E),T=Math.max(.01,pl.S+pl.R),P=ptWin(d-E);let r=.97;
+    if(k===1)r=P*.5/T;
+    else if(k===2){if(hlOn(pc)){const sg=buildTL(pc,W,H,d-E).segs.find(q=>q.type==='hl');if(sg)r=(sg.t0+(sg.t1-sg.t0)*.7)/T}else r=Math.min(.9,(P+(T-P)*.5)/T)}
+    $('hdr').value=Math.round(Math.max(0,Math.min(.99,r))*100);req()};
+  $('hdj1').onclick=()=>jump(1);$('hdj2').onclick=()=>jump(2);$('hdj3').onclick=()=>jump(3);
   $('hdrs').onclick=()=>{h={};load();req()};
   $('hdp').onclick=()=>{
     if(play){stop();return}
@@ -1237,10 +1244,10 @@ let lastGeo=null;
 function pointHand(ctx,W,c,g,pr,hd){
   if(!g||!$('himg').checked)return;
   if(!hd&&pr>=1)return;
-  const lerp=(a,b,t)=>a+(b-a)*t,H=ctx.canvas.height;
+  const lerp=(a,b,t)=>a+(b-a)*t,H=ctx.canvas.height,ho=c._hand?Object.assign({},c._hand,{pose:null,side:null}):null;
   const n=numPos(c),nx=g.ox+n.xc*g.k+W*.004,ny=g.oy+n.yb*g.k+W*.006;
   const nvis=!(ny<g.y0||ny>g.y1);
-  const pt=(x,y,slide,jit,a)=>{ctx.save();ctx.globalAlpha=a;drawHand(ctx,x,y,W,{k:'point',slide,flip:true,jit,rot:1.1});ctx.restore()};
+  const pt=(x,y,slide,jit,a)=>{ctx.save();ctx.globalAlpha=a;drawHand(ctx,x,y,W,{k:'point',slide,flip:true,jit,rot:1.1},ho);ctx.restore()};
   if(!hd){
     /* السلوك القديم: تشير ثم تنزلق للخارج */
     if(!nvis)return;
@@ -1248,8 +1255,10 @@ function pointHand(ctx,W,c,g,pr,hd){
     pt(nx,ny,slide,jit,1);return;
   }
   /* اليد دائماً ظاهرة: تشير للرقم ← تنتقل لهامش الصفحة ← تسحب الصفحة لأعلى بسحبات متكررة ← تستقر */
-  const gx=Math.min(W*.86,g.ox+c.width*g.k-W*.1),yb=hd.yb;
-  const hold=(x,y,a)=>{ctx.save();ctx.globalAlpha=a;drawHand(ctx,x,y,W,{k:'hold',slide:0,flip:true});ctx.restore()};
+  /* اليد الواقفة تقف بعد آخر حرف على الجهة اليمنى (جسمها يمتد لليمين خارج النص)، فلا تحجب الكلام */
+  let inkR=-1;try{getInk(c).b.forEach(b=>{if(b.x1>inkR)inkR=b.x1})}catch(e){}
+  const gx=inkR>0?Math.min(W*.975,g.ox+inkR*g.k+W*.09):Math.min(W*.86,g.ox+c.width*g.k-W*.1),yb=hd.yb;
+  const hold=(x,y,a)=>{ctx.save();ctx.globalAlpha=a;drawHand(ctx,x,y,W,{k:'hold',slide:0,flip:true},ho);ctx.restore()};
   if(pr<.86){
     if(!nvis)return;
     const slide=1-ez(pr/.14),jit=Math.sin(pr*60)*W*.0015*(1-slide);
@@ -1315,9 +1324,9 @@ function drawMarks(ctx,c,g,st){
   ctx.restore();
 }
 function markHand(ctx,W,c,g,hs,gx,yb){
-  const hl=c._hl,cl=x=>Math.max(0,Math.min(1,x));
-  const dw=(x,y,flip,a,kk)=>{ctx.save();ctx.globalAlpha=a;drawHand(ctx,x,y,W,{k:kk||'write',slide:0,flip});ctx.restore()};
-  const dh=(x,y,a)=>{ctx.save();ctx.globalAlpha=a;drawHand(ctx,x,y,W,{k:'hold',slide:0,flip:true});ctx.restore()};
+  const hl=c._hl,cl=x=>Math.max(0,Math.min(1,x)),ho=c._hand?Object.assign({},c._hand,{pose:null,side:null}):null;
+  const dw=(x,y,flip,a,kk)=>{ctx.save();ctx.globalAlpha=a;drawHand(ctx,x,y,W,{k:kk||'write',slide:0,flip},ho);ctx.restore()};
+  const dh=(x,y,a)=>{ctx.save();ctx.globalAlpha=a;drawHand(ctx,x,y,W,{k:'hold',slide:0,flip:true},ho);ctx.restore()};
   if(hs.type==='hl'){
     const mi=markInfo(c,g,hl[hs.idx]),f=hs.f,kk=mi.t==='n'?'point':'write';
     const from=hs.prev>=0?markTipAt(markInfo(c,g,hl[hs.prev]),1):{x:gx,y:yb};
