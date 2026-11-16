@@ -306,6 +306,7 @@ dialog#ed,dialog#rs{max-height:92vh;max-height:92dvh}
     <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="himg" checked> إظهار اليد وهي تمرّ على الكتابة في الصفحة</label>
     <label>ما الذي تتبعه اليد<select id="hmode"><option value="all">كل الكتابة البارزة (سوداء وزرقاء وملوّنة)</option><option value="blue">الكتابة الزرقاء فقط</option></select></label>
     <label>حركة اليد<select id="hpt"><option value="point" selected>تشير بالقلم على رقم السؤال فقط (بدون كتابة ولا تحرك على السطور)</option><option value="write">تكتب وتتحرك على السطور</option></select></label>
+    <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="hal" checked> اليد دائماً ظاهرة وتسحب الصفحة لأعلى (سحبات متكررة بدل تمرير تلقائي)</label>
     <label>نوع الانتقال بين القطع<select id="tr"><option value="mixed" selected>متنوع (سحب، إخراج باليد، قلب صفحة، تلاشي)</option><option value="slide">اليد تسحب القطعة الجديدة فوق القديمة</option><option value="pull">اليد تدفع القطعة القديمة للخارج</option><option value="flip">قلب صفحة</option><option value="fade">تلاشي</option></select></label>
     <label>اتجاه السحب<select id="ent"><option value="mixed" selected>متنوع (أسفل، يمين، أعلى، يسار)</option><option value="bottom">من الأسفل</option><option value="top">من الأعلى</option><option value="right">من اليمين</option><option value="left">من اليسار</option><option value="none">بدون انتقال</option></select></label>
     <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="sfx" checked> صوت سحب الورقة عند كل انتقال</label>
@@ -1127,13 +1128,38 @@ function numPos(c){
   return c._num=r;
 }
 let lastGeo=null;
-function pointHand(ctx,W,c,g,pr){
-  if(!g||pr>=1||!$('himg').checked)return;
-  const n=numPos(c),x=g.ox+n.xc*g.k,y=g.oy+n.yb*g.k;
-  if(y<g.y0||y>g.y1)return;
-  const slide=Math.max(1-ez(pr/.14),ez((pr-.86)/.14)),jit=Math.sin(pr*60)*W*.0015*(1-slide);
-  /* تأتي اليد من أسفل اليمين وتشير بطرف القلم إلى حافة الرقم السفلية، فلا تغطي سطور السؤال */
-  drawHand(ctx,x+W*.004,y+W*.006,W,{k:'point',slide,flip:true,jit,rot:1.1});
+function pointHand(ctx,W,c,g,pr,hd){
+  if(!g||!$('himg').checked)return;
+  if(!hd&&pr>=1)return;
+  const lerp=(a,b,t)=>a+(b-a)*t,H=ctx.canvas.height;
+  const n=numPos(c),nx=g.ox+n.xc*g.k+W*.004,ny=g.oy+n.yb*g.k+W*.006;
+  const nvis=!(ny<g.y0||ny>g.y1);
+  const pt=(x,y,slide,jit,a)=>{ctx.save();ctx.globalAlpha=a;drawHand(ctx,x,y,W,{k:'point',slide,flip:true,jit,rot:1.1});ctx.restore()};
+  if(!hd){
+    /* السلوك القديم: تشير ثم تنزلق للخارج */
+    if(!nvis)return;
+    const slide=Math.max(1-ez(pr/.14),ez((pr-.86)/.14)),jit=Math.sin(pr*60)*W*.0015*(1-slide);
+    pt(nx,ny,slide,jit,1);return;
+  }
+  /* اليد دائماً ظاهرة: تشير للرقم ← تنتقل لهامش الصفحة ← تسحب الصفحة لأعلى بسحبات متكررة ← تستقر */
+  const gx=Math.min(W*.86,g.ox+c.width*g.k-W*.1),yb=hd.yb;
+  const hold=(x,y,a)=>{ctx.save();ctx.globalAlpha=a;drawHand(ctx,x,y,W,{k:'hold',slide:0,flip:true});ctx.restore()};
+  if(pr<.86){
+    if(!nvis)return;
+    const slide=1-ez(pr/.14),jit=Math.sin(pr*60)*W*.0015*(1-slide);
+    pt(nx,ny,slide,jit,1);return;
+  }
+  if(pr<1){
+    const t=ez((pr-.86)/.14),x=lerp(nx,gx,t),y=lerp(nvis?ny:yb,yb,t);
+    pt(x,y,0,0,1-t);hold(x,y,t);return;
+  }
+  let y=yb,a=1;
+  if(hd.n>0){
+    const sN=Math.min(Math.max(hd.u,0),1)*hd.n,i=Math.min(hd.n-1,Math.floor(sN)),f=sN-i;
+    if(f<.72)y=yb-hd.dD*ez(f/.72);
+    else{y=yb-hd.dD+hd.dD*ez((f-.72)/.28);a=.8}
+  }
+  hold(gx,y,a);
 }
 
 /* ---- انتقال القطع: سحب باليد (دخول/خروج) أو قلب صفحة أو تلاشي ---- */
@@ -1144,7 +1170,7 @@ function frameAt(ctx,W,H,pc,e,d,i,S,R,prev){
   const E=entOf(pc,d),cl=x=>Math.max(0,Math.min(1,x));
   if(!E||e>=E){
     const e2=e-E;
-    if(ptOn()){const P=ptWin(d-E),S0=Math.max(0,S-P);frame(ctx,W,H,pc.c,pc.ans,1,pc.k,uOf(pc,Math.max(0,e2-P),S0),cl(e2/P));return}
+    if(ptOn()){const P=ptWin(d-E),S0=Math.max(0,S-P);frame(ctx,W,H,pc.c,pc.ans,1,pc.k,uOf(pc,Math.max(0,e2-P),S0),cl(e2/P),true);return}
     frame(ctx,W,H,pc.c,pc.ans,R?cl((e2-S)/R):1,pc.k,uOf(pc,e2,S));return;
   }
   const v=$('ent').value,dir=v==='mixed'?ENT_ORDER[(i+(i>>2))%4]:v;
@@ -1239,9 +1265,10 @@ function inkHand(ctx,W,c,g,ratio){
     pos-=l;
   }
 }
-function frame(ctx,W,H,c,ans,ratio=1,k='',u=0,pr=1){
+function frame(ctx,W,H,c,ans,ratio=1,k='',u=0,pr=1,hd=false){
   if(c._full)return frameFull(ctx,W,H,c._full,ans,ptOn()?1:ratio,k);
   const PT=ptOn();if(PT)ratio=1;
+  const HAL=PT&&hd&&!!$('hal')&&$('hal').checked&&$('himg').checked;let HD=null;
   const T=(k==='g'?'✓ ':k==='r'?'✗ ':'')+(ans||'');
   ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
   const uIn=u,on=!!ans&&$('hand').checked,L=layout(c,W,H,on),m=L.m,zh=L.zh;let geo=null;
@@ -1250,14 +1277,21 @@ function frame(ctx,W,H,c,ans,ratio=1,k='',u=0,pr=1){
   if(L.sc){
     const dw=c.width*L.wS,wh=zh-2*m,mo=c.height*L.wS-wh;
     if(!on&&!PT&&mo>0&&hasScrollHand(c))u=Math.max(0,Math.min(1,(scrollY(c,u)*L.wS-wh*.42)/mo));
+    if(HAL){
+      /* الصفحة تتحرك فقط أثناء سحبة اليد (72% من كل دورة) وتثبت أثناء رجوع اليد لأسفل */
+      const n=mo>0?Math.max(1,Math.ceil(mo/(.45*wh))):0;
+      HD={u,n,dD:n?mo/n:0,yb:m+wh*.78};
+      if(n){const sN=Math.min(Math.max(u,0),1)*n,i=Math.min(n-1,Math.floor(sN)),f=sN-i;u=(i+ez(Math.min(1,f/.72)))/n}
+    }
     const off=u*mo,u0=u;geo={ox:(W-dw)/2,oy:m-off,k:L.wS,y0:m,y1:m+wh};
     ctx.drawImage(c,0,off/L.wS,c.width,wh/L.wS,(W-dw)/2,m,dw,wh);
   }else{
     const s=Math.min((W-2*m)/refW(c),(zh-2*m)/refH(c),(W-2*m)/c.width,(zh-2*m)/c.height,2.2),dw=c.width*s,dh=c.height*s;
     const oy=on?m+(zh-2*m-dh)/2:(H-dh)/2;geo={ox:(W-dw)/2,oy,k:s,y0:-1e9,y1:1e9};
+    if(HAL)HD={u:1,n:0,dD:0,yb:zh*.8};
     ctx.drawImage(c,(W-dw)/2,oy,dw,dh);
   }
-  if(!on){if(PT){pointHand(ctx,W,c,geo,pr);return}if(geo&&L.sc&&hasScrollHand(c))scrollHand(ctx,W,c,geo,uIn);else if(geo&&ratio<1&&hasInkHand(c))inkHand(ctx,W,c,geo,ratio);return}
+  if(!on){if(PT){pointHand(ctx,W,c,geo,pr,HD);return}if(geo&&L.sc&&hasScrollHand(c))scrollHand(ctx,W,c,geo,uIn);else if(geo&&ratio<1&&hasInkHand(c))inkHand(ctx,W,c,geo,ratio);return}
   const aw=W-2*m,ah=H-zh-m;
   ctx.strokeStyle='#c9d3ea';ctx.lineWidth=Math.max(1,W/640);ctx.beginPath();ctx.moveTo(m,zh);ctx.lineTo(W-m,zh);ctx.stroke();
   ctx.direction='rtl';ctx.textAlign='right';ctx.textBaseline='top';ctx.fillStyle=k==='g'?'#157a3d':k==='r'?'#c0261f':'#1b3fa0';
@@ -1271,7 +1305,7 @@ function frame(ctx,W,H,c,ans,ratio=1,k='',u=0,pr=1){
     if(f>0&&f<1){px=W-m-vis;py=y+fs*.95}
     pos-=wi;y+=fs*1.45;if(pos<=0)break;
   }
-  if(PT){pointHand(ctx,W,c,geo,pr);return}
+  if(PT){pointHand(ctx,W,c,geo,pr,HD);return}
   if(px!==null&&ratio<1&&!k&&$('himg').checked&&drawHand(ctx,px,py,W,ratio))return;
   if(px!==null&&ratio<1){
     const L=fs*1.3,dx=L*.57,dy=-L*.82;
@@ -2138,7 +2172,7 @@ function bulkInfo(){
   $('bpengo').onclick=()=>{if(!need())return;const k=$('bpen').value;sel().forEach(p=>p.k=k);draw()};
 
   /* القوالب */
-  const KEY='vt-templates',IDS=['parts','sens','enh','sec','res','br','fast','hand','scr','autod','amode','lowmem','r169','hpt','tr','ent','sfx','asyn'];
+  const KEY='vt-templates',IDS=['parts','sens','enh','sec','res','br','fast','hand','scr','autod','amode','lowmem','r169','hpt','tr','ent','sfx','asyn','hal'];
   const rd=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'{}')||{}}catch(_){return{}}};
   const wr=o=>{try{localStorage.setItem(KEY,JSON.stringify(o));return true}catch(_){return false}};
   const el=id=>$(id),st=m=>{$('tplst').textContent=m};
