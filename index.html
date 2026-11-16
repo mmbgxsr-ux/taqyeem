@@ -368,12 +368,12 @@ dialog#ed,dialog#rs,dialog#hd{max-height:92vh;max-height:92dvh}
   <div class="row" style="gap:6px;align-items:center">
     <button class="sm" id="hlr">🖍 تظليل منطقة</button><button class="alt sm" id="hll">〰 خط</button><button class="alt sm" id="hlf">▭ إطار</button><button class="alt sm" id="hlu">＿ تسطير</button><button class="alt sm" id="hln">🔢 رقم</button>
     <span id="hlcols" style="display:inline-flex;gap:6px"></span>
-    <button class="alt sm" id="hlun">↩ تراجع</button><button class="alt sm" id="hlclr">مسح الكل</button>
+    <button class="alt sm" id="hlab" title="يظلّل أسطر الكتابة الزرقاء كلها بنقرة واحدة">✨ الأزرق تلقائياً</button><button class="alt sm" id="hlaa" title="يظلّل كل الأسطر البارزة">✨ كل الأسطر</button><button class="alt sm" id="hlun">↩ تراجع</button><button class="alt sm" id="hlclr">مسح الكل</button>
     <button class="alt sm" id="hlzo" aria-label="تصغير">➖</button><button class="alt sm" id="hlfit">⤢ الصفحة كاملة</button><button class="alt sm" id="hlzi" aria-label="تكبير">➕</button>
   </div>
   <p class="note" id="hli" style="height:4.6em;overflow:hidden">اسحب بإصبعك على الصورة لتحديد جزء. اليد ستظلله بالترتيب في الفيديو.</p>
   <div id="hlbox" style="overflow:auto;height:68vh;height:68dvh;text-align:center"><canvas id="hlc" style="touch-action:none;max-width:none;border:1px solid var(--line);display:inline-block;vertical-align:top"></canvas></div>
-  <div id="hlls" style="display:flex;flex-direction:column;gap:4px;margin:6px 0;height:96px;overflow:auto"></div>
+  <div id="hlls" style="display:flex;flex-direction:column;gap:4px;margin:6px 0;height:120px;overflow:auto"></div>
 </dialog>
 <dialog id="spd" aria-label="نقاط الصوت">
   <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px"><b>🎵 نقاط الصوت</b><span><button id="spok">تم</button> <button id="spcx" class="alt">إلغاء</button></span></div>
@@ -1291,6 +1291,22 @@ function pointHand(ctx,W,c,g,pr,hd){
 /* ---- التظليل: يحدده المستخدم في شاشة التعديل وترسمه اليد في الفيديو ---- */
 const HL_COLS=['#ffe14d','#8be58f','#ff9ecb','#ff8a80'];
 const hlOn=pc=>!!(ptOn()&&$('hal')&&$('hal').checked&&$('himg')&&$('himg').checked&&pc.c&&!pc.c._full&&pc.c._hl&&pc.c._hl.length);
+/* كلمات كل سطر: مقاطع أفقية يفصل بينها فراغ (لالتقاط حدود الكلمات عند التظليل) */
+function inkWords(c){
+  if(c._wd&&c._wdM===inkMode())return c._wd;
+  const bs=getInk(c).b;c._wdM=inkMode();const out=[];let cx;try{cx=c.getContext('2d',{willReadFrequently:true})}catch(e){}
+  bs.forEach(b=>{
+    const y0=Math.max(0,Math.floor(b.y0)),h=Math.max(1,Math.min(c.height-y0,Math.ceil(b.y1-b.y0))),x0=Math.max(0,Math.floor(b.x0)-2),w=Math.max(1,Math.min(c.width-x0,Math.ceil(b.x1-b.x0)+4));
+    let d;try{d=cx.getImageData(x0,y0,w,h).data}catch(e){out.push([{x0:b.x0,x1:b.x1}]);return}
+    const col=new Uint8Array(w);
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=(y*w+x)*4,r=d[i],g=d[i+1],bl=d[i+2],l=(r*77+g*150+bl*29)>>8;if(l<175||(Math.max(r,g,bl)-Math.min(r,g,bl)>=60&&l<225))col[x]=1}
+    const gap=Math.max(5,h*.3),ws=[];let st=-1,last=-1;
+    for(let x=0;x<w;x++){if(col[x]){if(st<0)st=x;else if(x-last>gap){ws.push({x0:x0+st,x1:x0+last+1});st=x}last=x}}
+    if(st>=0)ws.push({x0:x0+st,x1:x0+last+1});
+    out.push(ws.length?ws:[{x0:b.x0,x1:b.x1}]);
+  });
+  return c._wd=out;
+}
 function markInfo(c,g,mk){
   const cw=c.width*g.k,ch=c.height*g.k,X=v=>g.ox+v*cw,Y=v=>g.oy+v*ch;
   if(mk.t==='n'){const a={x:X(mk.x0),y:Y(mk.y0)};return{t:'n',a,b:a,flip:true}}
@@ -1299,10 +1315,12 @@ function markInfo(c,g,mk){
   const X0=X(Math.min(mk.x0,mk.x1)),X1=X(Math.max(mk.x0,mk.x1)),Y0=Y(Math.min(mk.y0,mk.y1)),Y1=Y(Math.max(mk.y0,mk.y1));
   /* كل شريط تظليل يلتصق بسطر فعلي من النص داخل المنطقة؛ وإن لم يُعثر على سطور تُقسَّم المنطقة بالتساوي */
   let rows=[];
-  try{const lo=Math.min(mk.y0,mk.y1),hi=Math.max(mk.y0,mk.y1);
-    getInk(c).b.forEach(b=>{const fy=(b.y0+b.y1)/2/c.height;if(fy<lo||fy>hi)return;
-      const h=(b.y1-b.y0)*g.k*1.3+cw*.006;rows.push({y:Y(fy)-h/2,h})})}catch(e){}
-  if(!rows.length){const nb=Math.max(1,Math.ceil((Y1-Y0)/(cw*.035)-.15)),bh=(Y1-Y0)/nb;for(let j=0;j<nb;j++)rows.push({y:Y0+j*bh,h:bh})}
+  try{const lo=Math.min(mk.y0,mk.y1),hi=Math.max(mk.y0,mk.y1),bs=getInk(c).b,wd=inkWords(c),xa=Math.min(mk.x0,mk.x1)*c.width,xb=Math.max(mk.x0,mk.x1)*c.width,pad=cw*.004;
+    bs.forEach((b,i)=>{const fy=(b.y0+b.y1)/2/c.height;if(Math.min(b.y1,hi*c.height)-Math.max(b.y0,lo*c.height)<(b.y1-b.y0)*.35)return;
+      const ws=(wd[i]||[]).filter(w=>Math.min(w.x1,xb)-Math.max(w.x0,xa)>=(w.x1-w.x0)*.4);if(!ws.length)return;
+      const h=(b.y1-b.y0)*g.k*1.3+cw*.006;
+      rows.push({y:Y(fy)-h/2,h,xl:g.ox+Math.min(...ws.map(w=>w.x0))*g.k-pad,xr:g.ox+Math.max(...ws.map(w=>w.x1))*g.k+pad})})}catch(e){}
+  if(!rows.length){const nb=Math.max(1,Math.ceil((Y1-Y0)/(cw*.035)-.15)),bh=(Y1-Y0)/nb;for(let j=0;j<nb;j++)rows.push({y:Y0+j*bh,h:bh,xl:X0,xr:X1})}
   return{t:'r',X0,X1,Y0,Y1,rows,nb:rows.length,flip:true};
 }
 function markTipAt(mi,p){
@@ -1310,7 +1328,7 @@ function markTipAt(mi,p){
     if(d<=w)return{x:mi.X1-d,y:mi.Y0};d-=w;if(d<=h)return{x:mi.X0,y:mi.Y0+d};d-=h;if(d<=w)return{x:mi.X0+d,y:mi.Y1};d-=w;return{x:mi.X1,y:mi.Y1-d}}
   if(mi.t!=='r')return{x:mi.a.x+(mi.b.x-mi.a.x)*p,y:mi.a.y+(mi.b.y-mi.a.y)*p};
   const w=mi.X1-mi.X0,s=Math.min(.9999,Math.max(0,p))*mi.nb,j=Math.floor(s),f=s-j,r=mi.rows[j];
-  return{x:mi.X1-f*w,y:r.y+r.h/2};
+  return{x:r.xr-f*(r.xr-r.xl),y:r.y+r.h/2};
 }
 function paintMark(ctx,c,g,mk,p){
   const mi=markInfo(c,g,mk);
@@ -1336,9 +1354,9 @@ function paintMark(ctx,c,g,mk,p){
     ctx.globalCompositeOperation='multiply';ctx.fillStyle=mk.col;ctx.globalAlpha=.88;   /* الضرب يُبقي النص مقروءاً تحت اللون */
     for(let j=0;j<mi.nb;j++){
       const f=Math.max(0,Math.min(1,s-j));if(f<=0)break;
-      const R=mi.rows[j],h=R.h*.94,x=mi.X1-f*w,y=R.y+R.h*.03+Math.sin(j*2.3+mk.x0*9)*h*.035,rr=Math.min(h*.34,f*w/2);
+      const R=mi.rows[j],rw=R.xr-R.xl,h=R.h*.94,x=R.xr-f*rw,y=R.y+R.h*.03+Math.sin(j*2.3+mk.x0*9)*h*.035,rr=Math.min(h*.34,f*rw/2);
       ctx.shadowColor=mk.col;ctx.shadowBlur=h*.14;
-      ctx.beginPath();ctx.moveTo(x+rr,y);ctx.lineTo(x+f*w-rr,y);ctx.quadraticCurveTo(x+f*w,y,x+f*w,y+rr);ctx.lineTo(x+f*w,y+h-rr);ctx.quadraticCurveTo(x+f*w,y+h,x+f*w-rr,y+h);
+      ctx.beginPath();ctx.moveTo(x+rr,y);ctx.lineTo(x+f*rw-rr,y);ctx.quadraticCurveTo(x+f*rw,y,x+f*rw,y+rr);ctx.lineTo(x+f*rw,y+h-rr);ctx.quadraticCurveTo(x+f*rw,y+h,x+f*rw-rr,y+h);
       ctx.lineTo(x+rr,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-rr);ctx.lineTo(x,y+rr);ctx.quadraticCurveTo(x,y,x+rr,y);ctx.closePath();ctx.fill();
     }
   }
@@ -1390,14 +1408,14 @@ function buildTL(pc,W,H,d){
   });
   const nm=hl.length,ns=new Set(stopOf).size;
   /* علامة لها صوت تبقى بمدة صوتها؛ الباقي يتقاسم الوقت المتاح */
-  const Ta=hl.map(m=>m.au?Math.max(.6,m.au.duration+.25):0),sA=Ta.reduce((a,b)=>a+b,0),nF=Ta.filter(v=>!v).length;
-  const Tm=Math.max(.35,Math.min(2,nF?(.6*R0-ns*.3-sA)/nF:.35)),Ti=Ta.map(v=>v||Tm),Mt=Ti.reduce((a,b)=>a+b,0)+ns*.3;
+  const Ta=hl.map(m=>m.td>0?+m.td:m.au?Math.max(.6,m.au.duration+.25):0),Dl=hl.map(m=>m.dl>0?+m.dl:0),sA=Ta.reduce((a,b)=>a+b,0)+Dl.reduce((a,b)=>a+b,0),nF=Ta.filter(v=>!v).length;
+  const Tm=Math.max(.35,Math.min(2,nF?(.6*R0-ns*.3-sA)/nF:.35)),Ti=Ta.map((v,i)=>(v||Tm)+Dl[i]),Mt=Ti.reduce((a,b)=>a+b,0)+ns*.3;
   const ST=si.n?plan0(pc,W,H,Math.max(.5,R0-Mt)).S:0,sd=si.n?ST/si.n:0;
   const segs=[];let t=P;
   for(let s=0;s<=si.n;s++){
     const ms=[];stopOf.forEach((st,i)=>{if(st===s)ms.push(i)});
     let prev=-1;
-    ms.forEach(i=>{segs.push({type:'hl',t0:t,t1:t+Ti[i],idx:i,prev});t+=Ti[i];prev=i});
+    ms.forEach(i=>{segs.push({type:'hl',t0:t,t1:t+Ti[i],idx:i,prev,dl:Dl[i]});t+=Ti[i];prev=i});
     if(ms.length){segs.push({type:'appr',t0:t,t1:t+.3,prev});t+=.3}
     if(s<si.n){segs.push({type:'stroke',t0:t,t1:t+sd,i:s});t+=sd}
   }
@@ -1408,7 +1426,7 @@ function buildTL(pc,W,H,d){
     let uc=0;
     for(const sg of segs){
       if(tm>=sg.t1){if(sg.type==='hl')st.done[sg.idx]=1;else if(sg.type==='stroke')uc=(sg.i+1)/n;continue}
-      const f=cl((tm-sg.t0)/Math.max(1e-6,sg.t1-sg.t0));
+      const f=cl((tm-sg.t0-(sg.dl||0))/Math.max(1e-6,sg.t1-sg.t0-(sg.dl||0)));
       if(sg.type==='hl'){st.cur=sg.idx;st.pp=cl((f-.2)/.8);st.hand={type:'hl',idx:sg.idx,prev:sg.prev,f}}
       else if(sg.type==='appr')st.hand={type:'appr',prev:sg.prev,f};
       else uc=(sg.i+f)/n;
@@ -2642,12 +2660,37 @@ let openRs;
 })();
 
 /* ---- شاشة التظليل ---- */
+let hlLastTap=null;
 let hlPc=null,hlMarks=[],hlTool='r',hlCol=HL_COLS[0],hlDrag=null,hlK=1,hlRaf=0;
 function hlRender(){
   const cv=$('hlc'),x=cv.getContext('2d'),c=hlPc.c,g={ox:0,oy:0,k:hlK};
   x.clearRect(0,0,cv.width,cv.height);x.drawImage(c,0,0,cv.width,cv.height);
   hlMarks.forEach(m=>paintMark(x,c,g,m,1));
   if(hlDrag)paintMark(x,c,g,hlTool==='n'?{t:'n',col:hlCol,x0:hlDrag.x1,y0:hlDrag.y1,x1:hlDrag.x1,y1:hlDrag.y1,n:hlMarks.filter(m=>m.t==='n').length+1}:hlTool==='u'?{t:'l',s:'u',col:hlCol,x0:hlDrag.x0,y0:hlDrag.y1,x1:hlDrag.x1,y1:hlDrag.y1}:Object.assign({t:hlTool,col:hlCol},hlDrag),1);
+}
+function hlTap(fx,fy){
+  const c=hlPc.c,bs=getInk(c).b,wd=inkWords(c),py=fy*c.height,px=fx*c.width;
+  let bi=-1,bd=1e9;bs.forEach((b,i)=>{const d=py<b.y0?b.y0-py:py>b.y1?py-b.y1:0;if(d<bd){bd=d;bi=i}});
+  if(bi<0||bd>(bs[bi].y1-bs[bi].y0)*.8)return;
+  const b=bs[bi],now=Date.now(),dbl=!!(hlLastTap&&now-hlLastTap.t<450&&hlLastTap.bi===bi&&Math.abs(hlLastTap.px-px)<c.width*.05);
+  let x0=b.x0,x1=b.x1;
+  if(dbl){
+    const ws=wd[bi]||[],w=ws.find(w=>px>=w.x0-4&&px<=w.x1+4)||ws.slice().sort((p,q)=>Math.abs((p.x0+p.x1)/2-px)-Math.abs((q.x0+q.x1)/2-px))[0];
+    if(w){x0=w.x0;x1=w.x1}
+    const k=hlMarks.indexOf(hlLastTap.mk);if(k>=0)hlMarks.splice(k,1);
+  }
+  if(hlMarks.length>=40)return;
+  const mk={t:'r',col:hlCol,x0:x0/c.width,x1:x1/c.width,y0:b.y0/c.height,y1:b.y1/c.height};
+  hlMarks.push(mk);hlLastTap=dbl?null:{t:now,bi,px,mk};
+}
+/* تظليل تلقائي: يجمع الأسطر المتجاورة في علامة واحدة (mode: blue = الكتابة الزرقاء فقط، all = كل الكتابة البارزة) */
+function hlAuto(mode){
+  const c=hlPc.c,sel=$('hmode'),m0=sel?sel.value:'all';let bs=[];
+  try{if(sel)sel.value=mode;bs=getInk(c).b.slice()}finally{if(sel)sel.value=m0}
+  bs.sort((a,b)=>a.y0-b.y0);const gs=[];
+  bs.forEach(b=>{const g=gs[gs.length-1];if(g&&b.y0-g.y1<(g.y1-g.y0)*0+(b.y1-b.y0)*1.2){g.y1=Math.max(g.y1,b.y1);g.x0=Math.min(g.x0,b.x0);g.x1=Math.max(g.x1,b.x1)}else gs.push({y0:b.y0,y1:b.y1,x0:b.x0,x1:b.x1})});
+  let n=0;gs.forEach(g=>{if(hlMarks.length>=40)return;hlMarks.push({t:'r',col:hlCol,x0:g.x0/c.width,x1:g.x1/c.width,y0:g.y0/c.height,y1:g.y1/c.height});n++});
+  return n;
 }
 function hlNum(){let k=0;hlMarks.forEach(m=>{if(m.t==='n')m.n=++k})}
 function hlList(){
@@ -2659,13 +2702,14 @@ function hlList(){
     l.textContent=(i+1)+'. '+(m.t==='n'?'🔢 رقم '+m.n:m.t==='f'?'▭ إطار':m.t==='l'?(m.s==='u'?'＿ تسطير':'〰 خط'):'🖍 منطقة')+(m.au?' — 🔊':'');
     const sw=document.createElement('span');sw.style.cssText='width:14px;height:14px;border-radius:50%;background:'+m.col;
     const mv=(k)=>()=>{const j=i+k;[hlMarks[i],hlMarks[j]]=[hlMarks[j],hlMarks[i]];hlTools();hlRender()};
-    r.append(sw,l,bt('▲','قدّم في الترتيب',mv(-1),i===0),bt('▼','أخّر في الترتيب',mv(1),i===hlMarks.length-1));
+    const ni=(ph,tip,key)=>{const e=document.createElement('input');e.type='number';e.min=0;e.step=.5;e.max=60;e.placeholder=ph;e.title=tip;e.setAttribute('aria-label',tip);e.style.width='64px';e.value=m[key]>0?m[key]:'';e.oninput=()=>{m[key]=+e.value>0?+e.value:0};return e};
+    r.append(sw,l,ni('مدة ث','مدة هذه العلامة بالثواني (فارغ = تلقائي)','td'),ni('تأخير','تأخير قبل بدء هذه العلامة بالثواني','dl'),bt('▲','قدّم في الترتيب',mv(-1),i===0),bt('▼','أخّر في الترتيب',mv(1),i===hlMarks.length-1));
     r.append(bt('🗑','احذف العلامة',()=>{hlMarks.splice(i,1);hlTools();hlRender()}));
     box.append(r);
   });
 }
 function hlFitDur(pc){
-  if(!pc.hl||!pc.hl.some(m=>m.au))return;
+  if(!pc.hl||!pc.hl.some(m=>m.au||m.td>0||m.dl>0))return;
   pc.c._hl=pc.hl;if(!hlOn(pc))return;
   const W=+$('res').value||1280,H=Math.round(W*9/16)&~1,d0=dur(pc);let d=d0;
   for(let k=0;k<300&&d<900;k++){const E=entOf(pc,d);if(buildTL(pc,W,H,d-E).total<=d-E-.2)break;d=Math.round((d+.5)*10)/10}
@@ -2675,10 +2719,10 @@ function hlTools(){
   hlNum();$('hlr').className=hlTool==='r'?'sm':'alt sm';$('hll').className=hlTool==='l'?'sm':'alt sm';$('hln').className=hlTool==='n'?'sm':'alt sm';$('hlf').className=hlTool==='f'?'sm':'alt sm';$('hlu').className=hlTool==='u'?'sm':'alt sm';hlList();
   [...$('hlcols').children].forEach(b=>{b.style.outline=b.dataset.c===hlCol?'3px solid var(--acc)':'1px solid var(--line)'});
   $('hlun').disabled=!hlMarks.length;$('hlclr').disabled=!hlMarks.length;
-  $('hli').textContent=hlMarks.length?hlMarks.length+' علامة. اليد ستظلّلها بنفس ترتيب رسمها.':'اسحب بإصبعك على الصورة لتحديد جزء. اليد ستظلله بالترتيب في الفيديو.';
+  $('hli').textContent=hlMarks.length?hlMarks.length+' علامة. اليد ستظلّلها بنفس ترتيب رسمها.':'اسحب لتحديد جزء (يلتقط الكلمات والسطور تلقائياً)، أو انقر على سطر لتظليله، أو انقر مرتين على كلمة.';
 }
 function openHl(pc){
-  hlPc=pc;hlMarks=(pc.hl||[]).map(m=>Object.assign({},m));hlTool='r';hlCol=HL_COLS[0];hlDrag=null;
+  hlPc=pc;hlMarks=(pc.hl||[]).map(m=>Object.assign({},m));hlTool='r';hlCol=HL_COLS[0];hlDrag=null;hlLastTap=null;
   const cv=$('hlc'),maxW=2000;
   hlK=Math.min(1,maxW/pc.c.width,6000/pc.c.height);
   cv.width=Math.max(1,Math.round(pc.c.width*hlK));cv.height=Math.max(1,Math.round(pc.c.height*hlK));
@@ -2716,6 +2760,7 @@ function hlFit(){const cv=$('hlc'),b=$('hlbox');if(!cv||!b||!hlPc)return;const b
     if(gs){if(pts.size<2)gs=null;hlDrag=null;return}
     if(!hlDrag)return;const d=hlDrag;hlDrag=null;
     const dx=Math.abs(d.x1-d.x0),dy=Math.abs(d.y1-d.y0),ar=hlPc.c.height/hlPc.c.width;
+    if(hlTool==='r'&&dx<.015&&dy*ar<.012){hlTap(d.x1,d.y1);hlTools();hlRender();return}
     const ok=hlTool==='n'?true:(hlTool==='r'||hlTool==='f')?(dx>.015&&dy*ar>.004):hlTool==='u'?dx>.02:(Math.hypot(dx,dy*ar)>.02);
     if(ok&&hlMarks.length<40)hlMarks.push(hlTool==='n'?{t:'n',col:hlCol,x0:d.x1,y0:d.y1,x1:d.x1,y1:d.y1}:hlTool==='u'?{t:'l',s:'u',col:hlCol,x0:d.x0,y0:d.y1,x1:d.x1,y1:d.y1}:{t:hlTool,col:hlCol,x0:d.x0,y0:d.y0,x1:d.x1,y1:d.y1});
     hlTools();hlRender();
@@ -2725,7 +2770,9 @@ function hlFit(){const cv=$('hlc'),b=$('hlbox');if(!cv||!b||!hlPc)return;const b
     const r=cv.getBoundingClientRect(),fx=(e.clientX-r.left)/r.width,fy=(e.clientY-r.top)/r.height;
     hlZ=Math.max(1,Math.min(8,hlZ*Math.exp(-e.deltaY*.01)));hlFit();const q=cv.getBoundingClientRect();
     $('hlbox').scrollBy(q.left+fx*q.width-e.clientX,q.top+fy*q.height-e.clientY)},{passive:false});
-  $('hlr').onclick=()=>{hlTool='r';hlTools()};$('hll').onclick=()=>{hlTool='l';hlTools()};$('hln').onclick=()=>{hlTool='n';hlTools()};$('hlf').onclick=()=>{hlTool='f';hlTools()};$('hlu').onclick=()=>{hlTool='u';hlTools()};
+  $('hlr').onclick=()=>{hlTool='r';hlTools()};$('hll').onclick=()=>{hlTool='l';hlTools()};$('hln').onclick=()=>{hlTool='n';hlTools()};$('hlf').onclick=()=>{hlTool='f';hlTools()};
+  const auto=m=>{const n=hlAuto(m);$('hli').textContent=n?'أُضيفت '+n+' علامة تلقائياً. يمكنك حذف أي علامة أو تعديل ترتيبها من القائمة.':'لم يُعثر على كتابة مناسبة.';hlTools();hlRender()};
+  $('hlab').onclick=()=>auto('blue');$('hlaa').onclick=()=>auto('all');$('hlu').onclick=()=>{hlTool='u';hlTools()};
   $('hlun').onclick=()=>{hlMarks.pop();hlTools();hlRender()};
   $('hlclr').onclick=()=>{hlMarks=[];hlTools();hlRender()};
   $('hlok').onclick=()=>{hlPc.hl=hlMarks.length?hlMarks:null;hlPc.c._hl=hlPc.hl;hlFitDur(hlPc);$('hld').close();draw();updTot()};
