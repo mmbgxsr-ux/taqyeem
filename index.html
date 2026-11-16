@@ -363,6 +363,12 @@ dialog#ed,dialog#rs,dialog#hd{max-height:92vh;max-height:92dvh}
   </div>
 </dialog>
 
+<dialog id="hpd" aria-label="موضع اليد">
+  <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px"><b>✋ موضع اليد على القطعة</b><span><button id="hpok">تم</button> <button id="hpcx" class="alt">إلغاء</button></span></div>
+  <p class="note" id="hpi">المس أو اسحب على المعاينة لتحديد المكان الذي تمسك فيه اليد الصفحة.</p>
+  <canvas id="hpc" style="touch-action:none;width:100%;max-width:640px;border:1px solid var(--line);display:block"></canvas>
+  <div class="row" style="margin-top:8px"><button class="alt sm" id="hpr">رجوع للوضع التلقائي</button></div>
+</dialog>
 <dialog id="hld" aria-label="تظليل أجزاء من القطعة">
   <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px"><b>🖍 تظليل أجزاء من القطعة</b><span><button id="hlok">تم</button> <button id="hlcx" class="alt">إلغاء</button></span></div>
   <div class="row" style="gap:6px;align-items:center">
@@ -970,7 +976,7 @@ $('pord').onchange=()=>{
 try{const m=localStorage.getItem('vt-pord');if(m==='auto'||m==='manual')$('pord').value=m}catch(e){}
 function mv(i,k){snap();const j=i+k;[pieces[i],pieces[j]]=[pieces[j],pieces[i]];setPord('manual');draw()}
 function draw(){
-  const g=$('grid');g.innerHTML='';pieces.forEach(p=>{p.c._sm=p.sm||'';p.c._pm=p.pm?1:0;p.c._hl=p.hl&&p.hl.length?p.hl:null;p.c._hand=p.hand||null});
+  const g=$('grid');g.innerHTML='';pieces.forEach(p=>{p.c._sm=p.sm||'';p.c._pm=p.pm?1:0;p.c._hl=p.hl&&p.hl.length?p.hl:null;p.c._hand=p.hand||null;p.c._hp=p.hp||null});
   pieces.forEach((pc,i)=>{
     const d=document.createElement('div');d.className='th'+(pc.keep?'':' off');
     const v=document.createElement('canvas');v.width=320;v.height=180;frame(v.getContext('2d'),320,180,pc.c,pc.ans,1,pc.k,pc.u||0);
@@ -982,7 +988,7 @@ function draw(){
     const inp=document.createElement('input');inp.type='number';inp.min=1;inp.max=300;inp.placeholder=dur(Object.assign({},pc,{d:0}));inp.value=pc.d||'';inp.title='مدة هذه القطعة بالثواني';inp.setAttribute('aria-label','مدة هذه القطعة بالثواني');
     inp.oninput=()=>{pc.d=+inp.value||0;updTot()};
     t.append(mk('→','قدّم القطعة',()=>mv(i,-1),i==0),mk('←','أخّر القطعة',()=>mv(i,1),i==pieces.length-1),
-      mk('✂','قسّم القطعة نصفين',()=>split(i)),mk('دمج','ادمج مع التالية',()=>merge(i),i==pieces.length-1),mk('📐','غيّر أبعاد القطعة (يُحفظ الأصل)',()=>openRs([pc]),!!pc.c._full),mk('🖍'+(pc.hl&&pc.hl.length?pc.hl.length:''),'تظليل أجزاء من القطعة (تظلّلها اليد في الفيديو)',()=>openHl(pc),!!pc.c._full),mk('🗑','احذف القطعة نهائياً (يمكن التراجع)',()=>delPieces([pc])),inp,...auBtns(pc,mk),mk('🎵'+(pc.sp&&pc.sp.length?pc.sp.length:''),'نقاط صوت: صوت يبدأ عند ظهور مكان معين في الشاشة',()=>openSp(pc),!!pc.c._full),mk('✋','اضبط موضع اليد واتجاهها لهذه القطعة'+(pc.hand?' (معدّلة)':''),()=>openHand(pc),!!pc.c._full));
+      mk('✂','قسّم القطعة نصفين',()=>split(i)),mk('دمج','ادمج مع التالية',()=>merge(i),i==pieces.length-1),mk('📐','غيّر أبعاد القطعة (يُحفظ الأصل)',()=>openRs([pc]),!!pc.c._full),mk('📍'+(pc.hp?'•':''),'موضع إمساك اليد للصفحة (المس أو اسحب على المعاينة)',()=>openHp(pc),!!pc.c._full),mk('🖍'+(pc.hl&&pc.hl.length?pc.hl.length:''),'تظليل أجزاء من القطعة (تظلّلها اليد في الفيديو)',()=>openHl(pc),!!pc.c._full),mk('🗑','احذف القطعة نهائياً (يمكن التراجع)',()=>delPieces([pc])),inp,...auBtns(pc,mk),mk('🎵'+(pc.sp&&pc.sp.length?pc.sp.length:''),'نقاط صوت: صوت يبدأ عند ظهور مكان معين في الشاشة',()=>openSp(pc),!!pc.c._full),mk('✋','اضبط موضع اليد واتجاهها لهذه القطعة'+(pc.hand?' (معدّلة)':''),()=>openHand(pc),!!pc.c._full));
     const ta=document.createElement('textarea');ta.rows=2;ta.placeholder='الإجابة (اكتبها أو عدّلها)';ta.setAttribute('aria-label','الإجابة: '+pc.label);ta.value=pc.ans||'';
     ta.style.cssText='width:100%;margin-top:6px;font:inherit;font-size:.85rem;border:1px solid var(--line);border-radius:6px;padding:4px;background:transparent;color:inherit';
     ta.oninput=()=>{pc.ans=ta.value;pc.chk='';pc.lib=false;updTot()};ta.onchange=()=>frame(v.getContext('2d'),320,180,pc.c,pc.ans,1,pc.k,pc.u||0);
@@ -1266,7 +1272,7 @@ function pointHand(ctx,W,c,g,pr,hd){
   /* اليد دائماً ظاهرة: تشير للرقم ← تنتقل لهامش الصفحة ← تسحب الصفحة لأعلى بسحبات متكررة ← تستقر */
   /* اليد الواقفة تقف بعد آخر حرف على الجهة اليمنى (جسمها يمتد لليمين خارج النص)، فلا تحجب الكلام */
   let inkR=-1;try{getInk(c).b.forEach(b=>{if(b.x1>inkR)inkR=b.x1})}catch(e){}
-  const gx=inkR>0?Math.min(W*.975,g.ox+inkR*g.k+W*.09):Math.min(W*.86,g.ox+c.width*g.k-W*.1),yb=hd.yb;
+  const gx=hd.gx!=null?hd.gx:inkR>0?Math.min(W*.975,g.ox+inkR*g.k+W*.09):Math.min(W*.86,g.ox+c.width*g.k-W*.1),yb=hd.yb;
   const hold=(x,y,a)=>{ctx.save();ctx.globalAlpha=a;drawHand(ctx,x,y,W,{k:'hold',slide:0,flip:true},ho);ctx.restore()};
   if(pr<.86){
     if(!nvis)return;
@@ -1277,14 +1283,14 @@ function pointHand(ctx,W,c,g,pr,hd){
     const t=ez((pr-.86)/.14),x=lerp(nx,gx,t),y=lerp(nvis?ny:yb,yb,t);
     pt(x,y,0,0,1-t);hold(x,y,t);return;
   }
-  const hs=hd.st&&hd.st.hand;
-  if(hs&&(hs.type==='hl'||hs.type==='appr')){markHand(ctx,W,c,g,hs,gx,yb);return}
   let y=yb,a=1;
   if(hd.n>0){
     const sN=Math.min(Math.max(hd.u,0),1)*hd.n,i=Math.min(hd.n-1,Math.floor(sN)),f=sN-i;
     if(f<.72)y=yb-hd.dD*ez(f/.72);
     else{y=yb-hd.dD+hd.dD*ez((f-.72)/.28);a=f>=.999?1:.8}
   }
+  const hs=hd.st&&hd.st.hand;
+  if(hs&&(hs.type==='hl'||hs.type==='appr'||hs.type==='wait')){markHand(ctx,W,c,g,hs,gx,y);return}
   hold(gx,y,a);
 }
 
@@ -1381,12 +1387,14 @@ function markHand(ctx,W,c,g,hs,gx,yb){
       const t=ez(f/.2),s0=markTipAt(mi,0),x=from.x+(s0.x-from.x)*t,y=from.y+(s0.y-from.y)*t;
       if(hs.prev<0){dh(x,y,1-t);dw(x,y,mi.flip,t,kk)}else dw(x,y,mi.flip,1,kk);
     }else{const tp=markTipAt(mi,cl((f-.2)/.8));dw(tp.x,tp.y,mi.flip,1,kk)}
+  }else if(hs.type==='wait'){
+    const mi=markInfo(c,g,hl[hs.prev]),e=markTipAt(mi,1);dw(e.x,e.y,mi.flip,1,mi.t==='n'?'point':'write');
   }else{
     const mi=markInfo(c,g,hl[hs.prev]),e=markTipAt(mi,1),t=ez(hs.f),x=e.x+(gx-e.x)*t,y=e.y+(yb-e.y)*t;
     dw(x,y,mi.flip,1-t,mi.t==='n'?'point':'write');dh(x,y,t);
   }
 }
-/* خطة زمنية للقطعة التي عليها علامات: إشارة ← (تظليل علامات المكان الحالي ← سحبة) × عدد المحطات */
+/* خطة زمنية: تمرير طبيعي متواصل؛ تظلّل اليد كل منطقة عندما يصل إليها التمرير (وليس بالانتقال من علامة لأخرى) */
 function scrollInfo(c,W,H,on){
   const L=layout(c,W,H,on);
   if(!L.sc)return{n:0,dD:0,mo:0,wh:0,L};
@@ -1399,42 +1407,48 @@ function buildTL(pc,W,H,d){
   const c=pc.c,hl=c._hl,on=!!pc.ans&&$('hand').checked;
   const key=[W,H,d.toFixed(3),on,JSON.stringify(hl),hl.map(m=>m.au?m.au.duration:0).join(',')].join('|');
   if(c._tl&&c._tl.key===key)return c._tl;
-  const si=scrollInfo(c,W,H,on),L=si.L,P=ptWin(d),R0=Math.max(.5,d-P);
-  const stopOf=hl.map(mk=>{
-    if(!si.n)return 0;
-    const top=Math.min(mk.y0,mk.y1)*c.height*L.wS,bot=Math.max(mk.y0,mk.y1)*c.height*L.wS;
-    for(let s=0;s<=si.n;s++){const off=s*si.dD;if(top>=off-2&&bot<=off+si.wh+2)return s}
-    return Math.min(si.n,Math.max(0,Math.floor(top/si.dD)));
+  const si=scrollInfo(c,W,H,on),L=si.L,P=ptWin(d),D=Math.max(.5,d-P),nm=hl.length;
+  /* مدة التظليل تتقلص إذا كان التمرير سريعاً حتى لا تخرج المنطقة من الشاشة قبل أن تنتهي اليد */
+  const spd=si.n?si.mo/D:0,Tm=Math.max(.4,Math.min(1.6,.6*D/nm,spd?.7*.65*si.wh/spd:9)),cl=x=>Math.max(0,Math.min(1,x));
+  /* مدة كل علامة: يحددها المستخدم، أو مدة صوتها، وإلا المدة التلقائية؛ وتأخير اختياري قبل البدء */
+  const Ti=hl.map(m=>m.td>0?+m.td:m.au?Math.max(.6,m.au.duration+.25):Tm),Dl=hl.map(m=>m.dl>0?+m.dl:0);
+  /* نفس تحويل الإطار: السحبة 72% تتحرك فيها الصفحة ثم ترجع اليد والصفحة ثابتة */
+  const mapU=u=>{if(!si.n)return 0;const sN=u*si.n,i=Math.min(si.n-1,Math.floor(sN)),f=sN-i;return(i+ez(Math.min(1,f/.72)))/si.n};
+  const uFor=tg=>{
+    if(!si.n||tg<=0)return 0;if(tg>=si.mo-1)return 1;
+    let lo=0,hi=1;for(let k=0;k<30;k++){const mid=(lo+hi)/2;if(mapU(mid)*si.mo>=tg)hi=mid;else lo=mid}return hi;
+  };
+  /* تبدأ اليد تظليل المنطقة عندما تظهر في الثلث الأسفل من الشاشة أثناء التمرير، ليبقى أمامها وقت قبل أن تخرج من الأعلى */
+  const items=hl.map((m,i)=>{const top=Math.min(m.y0,m.y1)*c.height*L.wS;return{i,top,uu:uFor(Math.max(0,top-si.wh*.65))}})
+    .sort((x,y)=>x.uu-y.uu||x.top-y.top);
+  const cntLate=items.filter(o=>o.uu>=.8).length;   /* علامات قرب نهاية الصفحة: نترك لها وقتاً بعد انتهاء التمرير */
+  const R=Math.max(.5,D-Math.min(.5*D,Math.max(1,cntLate)*Tm+.3));
+  const segs=[];let end=P,prev=-1;
+  items.forEach(o=>{
+    const trig=P+o.uu*R+(o.uu<=0?.3:0)+Dl[o.i],s0=Math.max(trig,end);
+    if(prev>=0){
+      if(s0-end>=1.2){segs.push({type:'appr',t0:end,t1:end+.3,prev});prev=-1}   /* بعيدة: تعود اليد لتمسك الصفحة */
+      else if(s0>end)segs.push({type:'wait',t0:end,t1:s0,prev});                /* قريبة: تبقى ماسكة القلم */
+    }
+    segs.push({type:'hl',t0:s0,t1:s0+Ti[o.i],idx:o.i,prev});end=s0+Ti[o.i];prev=o.i;
   });
-  const nm=hl.length,ns=new Set(stopOf).size;
-  /* علامة لها صوت تبقى بمدة صوتها؛ الباقي يتقاسم الوقت المتاح */
-  const Ta=hl.map(m=>m.td>0?+m.td:m.au?Math.max(.6,m.au.duration+.25):0),Dl=hl.map(m=>m.dl>0?+m.dl:0),sA=Ta.reduce((a,b)=>a+b,0)+Dl.reduce((a,b)=>a+b,0),nF=Ta.filter(v=>!v).length;
-  const Tm=Math.max(.35,Math.min(2,nF?(.6*R0-ns*.3-sA)/nF:.35)),Ti=Ta.map((v,i)=>(v||Tm)+Dl[i]),Mt=Ti.reduce((a,b)=>a+b,0)+ns*.3;
-  const ST=si.n?plan0(pc,W,H,Math.max(.5,R0-Mt)).S:0,sd=si.n?ST/si.n:0;
-  const segs=[];let t=P;
-  for(let s=0;s<=si.n;s++){
-    const ms=[];stopOf.forEach((st,i)=>{if(st===s)ms.push(i)});
-    let prev=-1;
-    ms.forEach(i=>{segs.push({type:'hl',t0:t,t1:t+Ti[i],idx:i,prev,dl:Dl[i]});t+=Ti[i];prev=i});
-    if(ms.length){segs.push({type:'appr',t0:t,t1:t+.3,prev});t+=.3}
-    if(s<si.n){segs.push({type:'stroke',t0:t,t1:t+sd,i:s});t+=sd}
-  }
-  const n=si.n,cl=x=>Math.max(0,Math.min(1,x));
+  if(prev>=0){segs.push({type:'appr',t0:end,t1:end+.3,prev});end+=.3}
+  const total=Math.max(P+R,end);
   const at=tm=>{
     const st={pr:Math.min(1,tm/P),u:0,done:{},cur:-1,pp:0,hand:null};
     if(tm<P)return st;
-    let uc=0;
+    st.u=cl((tm-P)/R);
     for(const sg of segs){
-      if(tm>=sg.t1){if(sg.type==='hl')st.done[sg.idx]=1;else if(sg.type==='stroke')uc=(sg.i+1)/n;continue}
-      const f=cl((tm-sg.t0-(sg.dl||0))/Math.max(1e-6,sg.t1-sg.t0-(sg.dl||0)));
+      if(tm>=sg.t1){if(sg.type==='hl')st.done[sg.idx]=1;continue}
+      if(tm<sg.t0)break;
+      const f=cl((tm-sg.t0)/Math.max(1e-6,sg.t1-sg.t0));
       if(sg.type==='hl'){st.cur=sg.idx;st.pp=cl((f-.2)/.8);st.hand={type:'hl',idx:sg.idx,prev:sg.prev,f}}
-      else if(sg.type==='appr')st.hand={type:'appr',prev:sg.prev,f};
-      else uc=(sg.i+f)/n;
-      st.u=uc;return st;
+      else st.hand={type:sg.type,prev:sg.prev,f};
+      break;
     }
-    st.u=n?1:0;return st;
+    return st;
   };
-  return c._tl={key,total:t,at,segs};
+  return c._tl={key,total,at,segs};
 }
 
 /* ---- انتقال القطع: سحب باليد (دخول/خروج) أو قلب صفحة أو تلاشي ---- */
@@ -1556,7 +1570,7 @@ function frame(ctx,W,H,c,ans,ratio=1,k='',u=0,pr=1,hd=false,st=null){
     if(HAL){
       /* الصفحة تتحرك فقط أثناء سحبة اليد (72% من كل دورة) وتثبت أثناء رجوع اليد لأسفل */
       const n=mo>0?Math.max(1,Math.ceil(mo/(.45*wh))):0;
-      HD={u,n,dD:n?mo/n:0,yb:m+wh*.78,st};
+      HD={u,n,dD:n?mo/n:0,yb:c._hp?zh*c._hp.y:m+wh*.78,gx:c._hp?W*c._hp.x:null,st};
       if(n){const sN=Math.min(Math.max(u,0),1)*n,i=Math.min(n-1,Math.floor(sN)),f=sN-i;u=(i+ez(Math.min(1,f/.72)))/n}
     }
     const off=u*mo,u0=u;geo={ox:(W-dw)/2,oy:m-off,k:L.wS,y0:m,y1:m+wh};
@@ -1564,7 +1578,7 @@ function frame(ctx,W,H,c,ans,ratio=1,k='',u=0,pr=1,hd=false,st=null){
   }else{
     const s=Math.min((W-2*m)/refW(c),(zh-2*m)/refH(c),(W-2*m)/c.width,(zh-2*m)/c.height,2.2),dw=c.width*s,dh=c.height*s;
     const oy=on?m+(zh-2*m-dh)/2:(H-dh)/2;geo={ox:(W-dw)/2,oy,k:s,y0:-1e9,y1:1e9};
-    if(HAL)HD={u:1,n:0,dD:0,yb:zh*.8,st};
+    if(HAL)HD={u:1,n:0,dD:0,yb:zh*(c._hp?c._hp.y:.8),gx:c._hp?W*c._hp.x:null,st};
     ctx.drawImage(c,(W-dw)/2,oy,dw,dh);
   }
   drawMarks(ctx,c,geo,st);lastGeo=geo;
@@ -2867,6 +2881,32 @@ function openSp(pc){
   $('spok').onclick=()=>{spPc.spOver=spOv;spPc.sp=spPts.length?spPts:null;spFitDur(spPc);$('spd').close();draw();updTot()};
   $('spcx').onclick=()=>{$('spd').close();draw()};
   addEventListener('resize',()=>{if($('spd').open)spFit()});
+})();
+
+/* ---- شاشة موضع اليد ---- */
+let hpPc=null,hpV=null;
+function hpRender(){
+  const cv=$('hpc'),W=cv.width,H=cv.height,x=cv.getContext('2d'),c=hpPc.c;
+  const old=c._hp;c._hp=hpV;
+  try{frame(x,W,H,c,hpPc.ans,1,hpPc.k,0,1,true,null)}finally{c._hp=old}
+}
+function openHp(pc){
+  hpPc=pc;hpV=pc.hp?Object.assign({},pc.hp):null;
+  const cv=$('hpc');cv.width=640;cv.height=360;
+  const ok=ptOn()&&$('hal').checked&&$('himg').checked;
+  $('hpi').textContent=ok?'المس أو اسحب على المعاينة لتحديد المكان الذي تمسك فيه اليد الصفحة.':'فعّل وضع الإشارة واليد التي تسحب الصفحة من الإعدادات ليظهر أثر هذا الخيار.';
+  hpRender();$('hpd').showModal();
+}
+(function(){
+  const cv=$('hpc');if(!cv)return;let dn=false;
+  const set=e=>{const r=cv.getBoundingClientRect(),W=cv.width,H=cv.height,on=!!hpPc.ans&&$('hand').checked,zh=on?H*.58:H;
+    hpV={x:Math.max(.08,Math.min(.95,(e.clientX-r.left)/r.width)),y:Math.max(.12,Math.min(.95,((e.clientY-r.top)/r.height*H)/zh))};hpRender()};
+  cv.addEventListener('pointerdown',e=>{e.preventDefault();cv.setPointerCapture(e.pointerId);dn=true;set(e)});
+  cv.addEventListener('pointermove',e=>{if(dn)set(e)});
+  cv.addEventListener('pointerup',()=>{dn=false});cv.addEventListener('pointercancel',()=>{dn=false});
+  $('hpr').onclick=()=>{hpV=null;hpRender()};
+  $('hpok').onclick=()=>{hpPc.hp=hpV;hpPc.c._hp=hpV;$('hpd').close();draw()};
+  $('hpcx').onclick=()=>$('hpd').close();
 })();
 </script>
 </body>
