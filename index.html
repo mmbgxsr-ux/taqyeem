@@ -379,6 +379,7 @@ dialog#ed,dialog#rs,dialog#hd{max-height:92vh;max-height:92dvh}
   <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px"><b>🎵 نقاط الصوت</b><span><button id="spok">تم</button> <button id="spcx" class="alt">إلغاء</button></span></div>
   <p class="note" id="spi">اضغط على المكان في الصورة ثم اختر ملف الصوت. يبدأ الصوت عندما يظهر هذا المكان في الشاشة أثناء الفيديو.</p>
   <div class="row" style="gap:6px"><button class="alt sm" id="spzo" aria-label="تصغير">➖</button><button class="alt sm" id="spfit">⤢ الصفحة كاملة</button><button class="alt sm" id="spzi" aria-label="تكبير">➕</button></div>
+  <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink);margin-top:6px"><input type="checkbox" id="spov"> السماح بتداخل الأصوات (الافتراضي: تشتغل بالترتيب واحدًا بعد الآخر)</label>
   <div id="spls" style="display:flex;flex-direction:column;gap:6px;margin:8px 0"></div>
   <div id="spbox" style="overflow:auto;height:55vh;height:55dvh;text-align:center"><canvas id="spc" style="max-width:none;border:1px solid var(--line);display:inline-block;vertical-align:top;cursor:crosshair"></canvas></div>
 </dialog>
@@ -2736,6 +2737,14 @@ function hlFit(){const cv=$('hlc'),b=$('hlbox');if(!cv||!b||!hlPc)return;const b
 /* ---- نقاط الصوت: صوت يبدأ عند ظهور مكان معين من الصفحة في الشاشة (مستقل عن التظليل) ---- */
 /* وقت بدء كل نقطة صوت (ثوانٍ بعد انتهاء دخول القطعة). النقطة الظاهرة من البداية تبدأ مبكراً؛ وإلا عند أول لحظة يدخل فيها مكانها الشاشة */
 function spStarts(pc){
+  const raw=spRaw(pc);if(pc.spOver)return raw;
+  /* تشغيل متتابع بلا تداخل: كل صوت يبدأ بعد انتهاء السابق (بفاصل نصف ثانية) أو في موعد ظهور مكانه أيهما أبعد */
+  const sp=pc.sp||[],res=raw.slice(),ord=sp.map((q,i)=>i).filter(i=>sp[i].au).sort((a,b)=>raw[a]-raw[b]||sp[a].y-sp[b].y);
+  let cur=pc.au?.1+pc.au.duration+.5:0;
+  ord.forEach(i=>{const t=Math.max(raw[i],cur);res[i]=t;cur=t+sp[i].au.duration+.5});
+  return res;
+}
+function spRaw(pc){
   const sp=pc.sp||[],res=sp.map(q=>q.mode==='sec'?Math.max(0,+q.sec||0):-1);
   if(res.every(v=>v>=0))return res;
   try{
@@ -2760,7 +2769,7 @@ function spFitDur(pc){
     if(need<=d||d>=900)break;pc.d=Math.ceil(need*10)/10;
   }
 }
-let spPc=null,spPts=[],spZ=1,spK=1;
+let spPc=null,spPts=[],spZ=1,spK=1,spOv=false;
 function spFit(){const cv=$('spc'),b=$('spbox');if(!cv||!b||!spPc)return;const f=Math.min(Math.max(100,b.clientWidth-6)/cv.width,Math.max(100,b.clientHeight-6)/cv.height)*spZ;cv.style.width=Math.round(cv.width*f)+'px';cv.style.height=Math.round(cv.height*f)+'px'}
 function spRender(){
   const cv=$('spc'),x=cv.getContext('2d'),c=spPc.c;
@@ -2773,7 +2782,7 @@ function spRender(){
 let spTmr=0;
 function spList(){
   const box=$('spls');box.innerHTML='';
-  const ts=spStarts(Object.assign({},spPc,{sp:spPts}));
+  const ts=spStarts(Object.assign({},spPc,{sp:spPts,spOver:spOv}));
   spPts.forEach((q,i)=>{
     const r=document.createElement('div');r.style.cssText='display:flex;gap:6px;align-items:center;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;padding:6px';
     const t=document.createElement('b');t.textContent=(i+1).toLocaleString('ar-EG')+'. 🔊 '+(q.auName||'')+' ('+(Math.round(q.au.duration*10)/10)+'ث)';t.style.flex='1';t.style.minWidth='120px';
@@ -2792,7 +2801,7 @@ function spList(){
   });
 }
 function openSp(pc){
-  spPc=pc;spPts=(pc.sp||[]).map(q=>Object.assign({},q));
+  spPc=pc;spPts=(pc.sp||[]).map(q=>Object.assign({},q));spOv=!!pc.spOver;$('spov').checked=spOv;
   /* صوت كان مربوطاً بعلامة تظليل ينتقل إلى نقطة صوت في مكان العلامة */
   (pc.hl||[]).forEach(m=>{if(m.au){spPts.push({x:(m.x0+m.x1)/2,y:Math.min(m.y0,m.y1),au:m.au,auName:m.auName,mode:'screen',vol:1});m.au=null;m.auName=''}});
   const cv=$('spc');spK=Math.min(1,2000/pc.c.width,6000/pc.c.height);
@@ -2807,7 +2816,8 @@ function openSp(pc){
     pickAu((b,n)=>{spPts.push({x,y,au:b,auName:n,mode:'screen',vol:1});spList();spRender()});
   });
   $('spzi').onclick=()=>{spZ=Math.min(8,spZ*1.4);spFit()};$('spzo').onclick=()=>{spZ=Math.max(1,spZ/1.4);spFit()};$('spfit').onclick=()=>{spZ=1;spFit();$('spbox').scrollTo(0,0)};
-  $('spok').onclick=()=>{spPc.sp=spPts.length?spPts:null;spFitDur(spPc);$('spd').close();draw();updTot()};
+  $('spov').onchange=()=>{spOv=$('spov').checked;spList()};
+  $('spok').onclick=()=>{spPc.spOver=spOv;spPc.sp=spPts.length?spPts:null;spFitDur(spPc);$('spd').close();draw();updTot()};
   $('spcx').onclick=()=>{$('spd').close();draw()};
   addEventListener('resize',()=>{if($('spd').open)spFit()});
 })();
