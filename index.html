@@ -371,17 +371,17 @@ dialog#ed,dialog#rs,dialog#hd{max-height:92vh;max-height:92dvh}
     <button class="alt sm" id="hlun">↩ تراجع</button><button class="alt sm" id="hlclr">مسح الكل</button>
     <button class="alt sm" id="hlzo" aria-label="تصغير">➖</button><button class="alt sm" id="hlfit">⤢ الصفحة كاملة</button><button class="alt sm" id="hlzi" aria-label="تكبير">➕</button>
   </div>
-  <div id="hlls" style="display:flex;flex-direction:column;gap:4px;margin:6px 0"></div>
-  <p class="note" id="hli">اسحب بإصبعك على الصورة لتحديد جزء. اليد ستظلله بالترتيب في الفيديو.</p>
+  <p class="note" id="hli" style="height:4.6em;overflow:hidden">اسحب بإصبعك على الصورة لتحديد جزء. اليد ستظلله بالترتيب في الفيديو.</p>
   <div id="hlbox" style="overflow:auto;height:68vh;height:68dvh;text-align:center"><canvas id="hlc" style="touch-action:none;max-width:none;border:1px solid var(--line);display:inline-block;vertical-align:top"></canvas></div>
+  <div id="hlls" style="display:flex;flex-direction:column;gap:4px;margin:6px 0;height:96px;overflow:auto"></div>
 </dialog>
 <dialog id="spd" aria-label="نقاط الصوت">
   <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px"><b>🎵 نقاط الصوت</b><span><button id="spok">تم</button> <button id="spcx" class="alt">إلغاء</button></span></div>
   <p class="note" id="spi">اضغط على المكان في الصورة ثم اختر ملف الصوت. يبدأ الصوت عندما يظهر هذا المكان في الشاشة أثناء الفيديو.</p>
   <div class="row" style="gap:6px"><button class="alt sm" id="spzo" aria-label="تصغير">➖</button><button class="alt sm" id="spfit">⤢ الصفحة كاملة</button><button class="alt sm" id="spzi" aria-label="تكبير">➕</button></div>
   <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink);margin-top:6px"><input type="checkbox" id="spov"> السماح بتداخل الأصوات (الافتراضي: تشتغل بالترتيب واحدًا بعد الآخر)</label>
-  <div id="spls" style="display:flex;flex-direction:column;gap:6px;margin:8px 0"></div>
   <div id="spbox" style="overflow:auto;height:55vh;height:55dvh;text-align:center"><canvas id="spc" style="max-width:none;border:1px solid var(--line);display:inline-block;vertical-align:top;cursor:crosshair"></canvas></div>
+  <div id="spls" style="display:flex;flex-direction:column;gap:6px;margin:8px 0;height:150px;overflow:auto"></div>
 </dialog>
 <dialog id="pw" aria-label="تنبيهات قبل الفيديو">
   <b>تنبيهات قبل إنشاء الفيديو</b>
