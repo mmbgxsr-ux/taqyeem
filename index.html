@@ -81,6 +81,10 @@ dialog#ed::backdrop{background:rgba(10,15,30,.55)}
 #ordl .oi[draggable=true]{cursor:grab}
 dialog#rs{width:min(560px,96vw);max-height:92vh;overflow:auto;border:0;border-radius:18px;padding:16px;background:var(--card);color:var(--ink);box-shadow:0 12px 40px rgba(0,0,0,.35)}
 dialog#rs::backdrop{background:rgba(10,15,30,.55)}
+dialog#hd{width:min(680px,96vw);max-height:92vh;overflow:auto;border:0;border-radius:18px;padding:16px;background:var(--card);color:var(--ink);box-shadow:0 12px 40px rgba(0,0,0,.35)}
+dialog#hd::backdrop{background:rgba(10,15,30,.55)}
+#hdc{width:100%;height:auto;display:block;touch-action:none;cursor:grab;border:1px solid var(--line);border-radius:10px;background:#fff}
+#hdc:active{cursor:grabbing}
 #rsc{width:auto;max-width:100%;max-height:38vh;margin:0 auto;display:block;border:1px solid var(--line);background:#fff;border-radius:6px}
 #rs .warn{color:#8a5200}@media (prefers-color-scheme:dark){#rs .warn{color:#f2c879}}
 /* ---- مظهر عصري: ألوان هادئة، بطاقات نظيفة، وشريط تنقل عائم ---- */
@@ -129,7 +133,7 @@ button,.btn,summary,.stp,#drop{touch-action:manipulation;-webkit-tap-highlight-c
 img,canvas,video,iframe{max-width:100%}
 video{max-height:60vh;max-height:60dvh}
 select,input[type=number],input[type=text],textarea{font-size:16px} /* يمنع تكبير الصفحة تلقائياً في iOS عند الكتابة */
-dialog#ed,dialog#rs{max-height:92vh;max-height:92dvh}
+dialog#ed,dialog#rs,dialog#hd{max-height:92vh;max-height:92dvh}
 #lowmem{flex:none}
 @media (max-width:600px){
   main{padding:12px 12px 128px}
@@ -406,6 +410,29 @@ dialog#ed,dialog#rs{max-height:92vh;max-height:92dvh}
   </div>
   <div class="row" style="margin-top:10px"><button class="alt sm" id="rsr">↺ استرجاع الأصل</button></div>
   <p class="note">يُحفظ الأصل دائماً، فيمكنك التغيير مراراً دون أي فقد في الجودة، أو الرجوع بزر «استرجاع الأصل» أو «تراجع».</p>
+</dialog>
+
+<dialog id="hd" aria-label="ضبط اليد لهذه القطعة">
+  <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px"><b id="hdt">ضبط اليد</b><span><button id="hdok" class="ok sm">تم</button> <button id="hdx" class="alt sm">إلغاء</button></span></div>
+  <canvas id="hdc" width="960" height="540" aria-label="معاينة اليد، اسحبها لتغيير موضعها"></canvas>
+  <p class="note" style="margin:6px 0">اسحب على المعاينة لتحريك اليد بالنسبة لطرف القلم. حرّك شريط التقدّم لترى اليد في أي لحظة.</p>
+  <div class="row" style="align-items:center">
+    <label style="flex:1">تقدّم الكتابة <span id="hdrv">35%</span><input type="range" id="hdr" min="0" max="99" value="35"></label>
+    <button id="hdp" class="alt sm">▶ تشغيل</button>
+  </div>
+  <div class="row" style="margin-top:6px">
+    <label>تدوير اليد <span id="hdrotv">0°</span><input type="range" id="hdrot" min="-60" max="60" value="0"></label>
+    <label>حجم اليد <span id="hdszv">100%</span><input type="range" id="hdsz" min="50" max="180" value="100"></label>
+  </div>
+  <div class="row" style="margin-top:6px">
+    <label>وضع اليد<select id="hdpose"><option value="">تلقائي (تشير ثم تكتب ثم تسترخي)</option><option value="write">كتابة فقط</option><option value="point">إشارة فقط</option></select></label>
+    <label>جهة دخول اليد وخروجها<select id="hdside"><option value="">تلقائي</option><option value="L">من اليسار</option><option value="R">من اليمين</option><option value="B">من الأسفل</option><option value="T">من الأعلى</option></select></label>
+  </div>
+  <div class="row" style="margin-top:6px;align-items:center">
+    <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="hdflip"> قلب اتجاه اليد (يد يسرى/يمنى)</label>
+    <label style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="hdoff"> إخفاء اليد في هذه القطعة</label>
+  </div>
+  <div class="row" style="margin-top:8px"><button class="alt sm" id="hdrs">↺ الوضع الافتراضي</button> <button class="alt sm" id="hdall">طبّق على كل القطع</button></div>
 </dialog>
 
 <script>
@@ -758,6 +785,59 @@ $('fit').onclick=()=>{
   const n=pieces.filter(p=>p.keep).length,each=Math.max(1,Math.round(audio.duration/n*10)/10);
   pieces.forEach(p=>p.d=each);draw();
 };
+/* ---- لوحة ضبط اليد لكل قطعة ---- */
+function openHand(pc){
+  const dlg=$('hd'),cv=$('hdc'),cx=cv.getContext('2d'),old=pc.hand?Object.assign({},pc.hand):null;
+  let h=Object.assign({},pc.hand||{}),done=false,raf=0,play=0,pend=0;
+  const isDef=o=>!o.off&&!o.flip&&!(+o.rot)&&!(+o.dx)&&!(+o.dy)&&!(o.sz&&o.sz!==1)&&!o.pose&&!o.side;
+  const norm=()=>{const o={};if(h.off)o.off=1;if(h.flip)o.flip=1;if(+h.rot)o.rot=Math.round(h.rot);if(+h.dx)o.dx=Math.round(h.dx*1e4)/1e4;if(+h.dy)o.dy=Math.round(h.dy*1e4)/1e4;if(h.sz&&h.sz!==1)o.sz=h.sz;if(h.pose)o.pose=h.pose;if(h.side)o.side=h.side;return Object.keys(o).length?o:null};
+  const ratio=()=>(+$('hdr').value)/100;
+  function paint(){
+    pend=0;if(done)return;pc.c._hand=norm();
+    const r=ratio(),on=!!pc.ans&&$('hand').checked;
+    frame(cx,cv.width,cv.height,pc.c,pc.ans,Math.min(.995,r),pc.k,pc.c._pm?r:(pc.u||0));
+    $('hdrv').textContent=Math.round(r*100)+'%';$('hdrotv').textContent=Math.round(+h.rot||0)+'°';$('hdszv').textContent=Math.round((h.sz||1)*100)+'%';
+  }
+  const req=()=>{if(!pend){pend=1;requestAnimationFrame(paint)}};
+  const load=()=>{$('hdrot').value=h.rot||0;$('hdsz').value=Math.round((h.sz||1)*100);$('hdpose').value=h.pose||'';$('hdside').value=h.side||'';$('hdflip').checked=!!h.flip;$('hdoff').checked=!!h.off};
+  const stop=()=>{play=0;cancelAnimationFrame(raf);$('hdp').textContent='▶ تشغيل'};
+  $('hdt').textContent='ضبط اليد: '+pc.label;
+  load();$('hdr').value=35;paint();
+  $('hdrot').oninput=()=>{h.rot=+$('hdrot').value;req()};
+  $('hdsz').oninput=()=>{h.sz=(+$('hdsz').value)/100;req()};
+  $('hdpose').onchange=()=>{h.pose=$('hdpose').value;req()};
+  $('hdside').onchange=()=>{h.side=$('hdside').value;req()};
+  $('hdflip').onchange=()=>{h.flip=$('hdflip').checked;req()};
+  $('hdoff').onchange=()=>{h.off=$('hdoff').checked;req()};
+  $('hdr').oninput=()=>{stop();req()};
+  $('hdrs').onclick=()=>{h={};load();req()};
+  $('hdp').onclick=()=>{
+    if(play){stop();return}
+    play=1;$('hdp').textContent='⏸ إيقاف';let t0=performance.now()-ratio()*6000;
+    const tick=t=>{if(!play)return;const r=Math.min(.99,(t-t0)/6000);$('hdr').value=Math.round(r*100);paint();if(r>=.99)stop();else raf=requestAnimationFrame(tick)};
+    raf=requestAnimationFrame(tick);
+  };
+  /* السحب: يحرّك اليد بالنسبة لطرف القلم (يعمل بالفأرة وباللمس) */
+  let dr=null;
+  cv.onpointerdown=e=>{stop();dr={x:e.clientX,y:e.clientY,dx:+h.dx||0,dy:+h.dy||0};try{cv.setPointerCapture(e.pointerId)}catch(_){}};
+  cv.onpointermove=e=>{if(!dr)return;const k=cv.width/cv.getBoundingClientRect().width;
+    h.dx=Math.max(-.6,Math.min(.6,dr.dx+(e.clientX-dr.x)*k/cv.width));h.dy=Math.max(-.6,Math.min(.6,dr.dy+(e.clientY-dr.y)*k/cv.width));req()};
+  cv.onpointerup=cv.onpointercancel=()=>{dr=null};
+  const finish=ok=>{
+    done=true;stop();
+    if(ok){pc.hand=norm();}else{pc.hand=old}
+    pc.c._hand=pc.hand||null;
+    if(dlg.open)dlg.close();draw();
+  };
+  $('hdok').onclick=()=>finish(true);$('hdx').onclick=()=>finish(false);
+  $('hdall').onclick=()=>{
+    if(!confirm('تطبيق هذا الضبط على كل القطع؟ سيستبدل ضبط اليد في القطع الأخرى.'))return;
+    const v=norm();pieces.forEach(q=>{if(!q.c._full){q.hand=v?Object.assign({},v):null;q.c._hand=q.hand}});
+    finish(true);
+  };
+  dlg.onclose=()=>{stop();if(!done){pc.c._hand=pc.hand||null}};
+  dlg.showModal();
+}
 /* ---- صوت لكل قطعة ولكل صفحة ---- */
 const AU_SR=44100;
 function mkBuf(len,sr,ch){
@@ -835,7 +915,7 @@ function split(i){
   const x=p.c.getContext('2d',{willReadFrequently:true});
   const pts=splitPoints(inkRows(x,p.c.width,h,+$('sens').value),h,2);
   const a=mkPiece(p.c,0,pts[1]),b=mkPiece(p.c,pts[1],h-pts[1]);if(!a||!b)return;
-  pieces.splice(i,1,{c:a,keep:true,pg:p.pg,y:p.y||0,pm:p.pm,sm:p.sm,label:p.label+' (أ)',au:p.au,auName:p.auName},{c:b,keep:true,pg:p.pg,y:(p.y||0)+pts[1],pm:p.pm,sm:p.sm,label:p.label+' (ب)'});draw();
+  pieces.splice(i,1,{c:a,keep:true,pg:p.pg,y:p.y||0,pm:p.pm,sm:p.sm,label:p.label+' (أ)',au:p.au,auName:p.auName,hand:p.hand},{c:b,keep:true,pg:p.pg,y:(p.y||0)+pts[1],pm:p.pm,sm:p.sm,label:p.label+' (ب)',hand:p.hand});draw();
 }
 function merge(i){
   snap();
@@ -843,7 +923,7 @@ function merge(i){
   const c=document.createElement('canvas');c.width=w;c.height=a.c.height+b.c.height+g;
   const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);
   x.drawImage(a.c,(w-a.c.width)/2,0);x.drawImage(b.c,(w-b.c.width)/2,a.c.height+g);
-  pieces.splice(i,2,{c:to169(c),keep:true,pg:a.pg,y:a.y,label:a.label+' + دمج',au:a.au||b.au,auName:a.au?a.auName:b.auName});draw();
+  pieces.splice(i,2,{c:to169(c),keep:true,pg:a.pg,y:a.y,label:a.label+' + دمج',au:a.au||b.au,auName:a.au?a.auName:b.auName,hand:a.hand||b.hand});draw();
 }
 function delPieces(l){snap();pieces=pieces.filter(p=>!l.includes(p));draw();$('info').textContent='حُذفت '+l.length+' قطعة. اضغط «تراجع» لاسترجاعها.'}
 /* الترتيب التلقائي: رقم الصفحة ثم موضع القطعة من أعلى الصفحة. القطع بلا بيانات تبقى بجوار ما قبلها */
@@ -868,7 +948,7 @@ $('pord').onchange=()=>{
 try{const m=localStorage.getItem('vt-pord');if(m==='auto'||m==='manual')$('pord').value=m}catch(e){}
 function mv(i,k){snap();const j=i+k;[pieces[i],pieces[j]]=[pieces[j],pieces[i]];setPord('manual');draw()}
 function draw(){
-  const g=$('grid');g.innerHTML='';pieces.forEach(p=>{p.c._sm=p.sm||'';p.c._pm=p.pm?1:0;p.c._hl=p.hl&&p.hl.length?p.hl:null});
+  const g=$('grid');g.innerHTML='';pieces.forEach(p=>{p.c._sm=p.sm||'';p.c._pm=p.pm?1:0;p.c._hl=p.hl&&p.hl.length?p.hl:null;p.c._hand=p.hand||null});
   pieces.forEach((pc,i)=>{
     const d=document.createElement('div');d.className='th'+(pc.keep?'':' off');
     const v=document.createElement('canvas');v.width=320;v.height=180;frame(v.getContext('2d'),320,180,pc.c,pc.ans,1,pc.k,pc.u||0);
@@ -880,7 +960,7 @@ function draw(){
     const inp=document.createElement('input');inp.type='number';inp.min=1;inp.max=300;inp.placeholder=dur(Object.assign({},pc,{d:0}));inp.value=pc.d||'';inp.title='مدة هذه القطعة بالثواني';inp.setAttribute('aria-label','مدة هذه القطعة بالثواني');
     inp.oninput=()=>{pc.d=+inp.value||0;updTot()};
     t.append(mk('→','قدّم القطعة',()=>mv(i,-1),i==0),mk('←','أخّر القطعة',()=>mv(i,1),i==pieces.length-1),
-      mk('✂','قسّم القطعة نصفين',()=>split(i)),mk('دمج','ادمج مع التالية',()=>merge(i),i==pieces.length-1),mk('📐','غيّر أبعاد القطعة (يُحفظ الأصل)',()=>openRs([pc]),!!pc.c._full),mk('🖍'+(pc.hl&&pc.hl.length?pc.hl.length:''),'تظليل أجزاء من القطعة (تظلّلها اليد في الفيديو)',()=>openHl(pc),!!pc.c._full),mk('🗑','احذف القطعة نهائياً (يمكن التراجع)',()=>delPieces([pc])),inp,...auBtns(pc,mk));
+      mk('✂','قسّم القطعة نصفين',()=>split(i)),mk('دمج','ادمج مع التالية',()=>merge(i),i==pieces.length-1),mk('📐','غيّر أبعاد القطعة (يُحفظ الأصل)',()=>openRs([pc]),!!pc.c._full),mk('🖍'+(pc.hl&&pc.hl.length?pc.hl.length:''),'تظليل أجزاء من القطعة (تظلّلها اليد في الفيديو)',()=>openHl(pc),!!pc.c._full),mk('🗑','احذف القطعة نهائياً (يمكن التراجع)',()=>delPieces([pc])),inp,...auBtns(pc,mk),mk('✋','اضبط موضع اليد واتجاهها لهذه القطعة'+(pc.hand?' (معدّلة)':''),()=>openHand(pc),!!pc.c._full));
     const ta=document.createElement('textarea');ta.rows=2;ta.placeholder='الإجابة (اكتبها أو عدّلها)';ta.setAttribute('aria-label','الإجابة: '+pc.label);ta.value=pc.ans||'';
     ta.style.cssText='width:100%;margin-top:6px;font:inherit;font-size:.85rem;border:1px solid var(--line);border-radius:6px;padding:4px;background:transparent;color:inherit';
     ta.oninput=()=>{pc.ans=ta.value;pc.chk='';pc.lib=false;updTot()};ta.onchange=()=>frame(v.getContext('2d'),320,180,pc.c,pc.ans,1,pc.k,pc.u||0);
@@ -1000,10 +1080,12 @@ function drawArm(ctx,o,pal,Lx){
 }
 /* r = تقدّم الكتابة 0..1: تنزلق اليد من حافة اليسار وهي تشير، ثم تتحول لوضع الكتابة، وقبل النهاية تسترخي وتخرج.
    الكتابة من اليمين لليسار، فجسم اليد يبقى دائمًا على الجهة غير المكتوبة (اليسار) */
-function drawHand(ctx,x,y,W,r){
-  const H=HANDS;
+/* opt (اختياري، لكل قطعة): off إخفاء، flip قلب الاتجاه، rot تدوير بالدرجات حول طرف القلم، dx/dy إزاحة (كسر من العرض)، sz مضاعف الحجم، pose write|point، side جهة الدخول L|R|B|T */
+function drawHand(ctx,x,y,W,r,opt){
+  const H=HANDS;opt=opt||{};
+  if(opt.off)return true;
   if(!H.write.i.complete||!H.write.i.naturalWidth)return false;
-  const f=W*.15/H.write.w;
+  const flip0=!!opt.flip,f=W*.15/H.write.w*(opt.sz>0?opt.sz:1);
   let slide=0,wp=0,ww=1,wh=0,jit=0,flip=false;
   if(r&&typeof r==='object'){slide=r.slide||0;flip=!!r.flip;jit=r.jit||0;ww=0;if(r.k==='hold')wh=1;else if(r.k==='write')ww=1;else wp=1}
   else if(typeof r==='number'){
@@ -1013,18 +1095,25 @@ function drawHand(ctx,x,y,W,r){
     wp=1-cf;wh=hw;ww=cf*(1-hw);
     jit=Math.sin(r*377)*W*.0012; /* ارتعاش خفيف جدًا كحركة يد بشرية */
   }
-  let dx=flip?slide*((W-x)+W*.17):-slide*(x+W*.17),dy=slide*W*.08;
-  const ro=(r&&typeof r==='object'&&r.rot)||0;
-  if(ro){const dist=slide*W*.5,ph=ro+.149;dx=Math.cos(ph)*dist;dy=Math.sin(ph)*dist}
-  const rot=(typeof r==='number'?Math.sin(r*53)*.012:0)+ro;
-  ctx.save();ctx.translate(x+dx+jit,y+dy+jit*.6);ctx.rotate(rot);if(flip)ctx.scale(-1,1);
+  if(opt.pose==='write'){wp=0;wh=0;ww=1}else if(opt.pose==='point'){wp=1;wh=0;ww=0}
+  flip=flip!==flip0;x+=(opt.dx||0)*W;y+=(opt.dy||0)*W;
+  const ro0=((r&&typeof r==='object'&&r.rot)||0)+(opt.rot||0)*Math.PI/180;
+  const side=opt.side||(flip?'R':'L'),cw=ctx.canvas?ctx.canvas.width:W,ch=ctx.canvas?ctx.canvas.height:W*.5625;
+  let dx=0,dy=0;
+  if(ro0){const dist=slide*W*.5,ph=ro0+.149;dx=Math.cos(ph)*dist;dy=Math.sin(ph)*dist}
+  else if(side==='L'){dx=-slide*(x+W*.17);dy=slide*W*.08}
+  else if(side==='R'){dx=slide*(cw-x+W*.17);dy=slide*W*.08}
+  else if(side==='B'){dy=slide*(ch-y+W*.2)}
+  else{dy=-slide*(y+W*.25)}
+  const rot=(typeof r==='number'?Math.sin(r*53)*.012:0)+ro0;
+  ctx.save();ctx.translate(x+dx+jit,y+dy+jit*.6);ctx.rotate(rot);
   ctx.shadowColor='rgba(20,25,40,.32)';ctx.shadowBlur=W*.011;ctx.shadowOffsetX=-W*.005;ctx.shadowOffsetY=W*.006;
   ctx.imageSmoothingQuality='high';
   const sv=typeof document!=='undefined'&&document.getElementById('hsl'),pal=sv?SLV[sv.value]:SLV.navy;
   for(const [k,a] of [['point',wp],['write',ww],['hold',wh]]){
     const o=H[k];if(a<=.01||!o.i.complete||!o.i.naturalWidth)continue;
     ctx.save();ctx.globalAlpha=Math.min(1,a);
-    if(o.mir)ctx.scale(-1,1);
+    if(!!o.mir!==flip)ctx.scale(-1,1);
     ctx.translate(-o.tx*f,-o.ty*f);ctx.scale(f,f);
     drawArm(ctx,o,pal,W*1.5/f);
     ctx.drawImage(o.i,0,0,o.w,o.h);
@@ -1078,7 +1167,7 @@ function scrollY(c,r){let s=0,n=0;for(let t=-.04;t<=.0401;t+=.01){s+=pathAt(c,Ma
 function scrollHand(ctx,W,c,g,u){
   const q=pathAt(c,u),x=g.ox+q.x*g.k,y=g.oy+q.y*g.k;
   if(y<g.y0-30||y>g.y1+30)return;
-  drawHand(ctx,x,y+Math.sin(u*90)*W*.002,W,u);
+  drawHand(ctx,x,y+Math.sin(u*90)*W*.002,W,u,c._hand);
 }
 const camOn=c=>!c._full&&$('cam')&&$('cam').checked&&hasInkHand(c);
 /* مسار القلم على كل السطور بإحداثيات الصورة: كتابة السطر من اليمين لليسار ثم انتقال للسطر التالي */
@@ -1366,7 +1455,7 @@ function camFrame(ctx,W,H,c,L,r){
   oy1=dh>H?Math.min(0,Math.max(H-dh,oy1)):(H-dh)/2;
   const k=k0+(k1-k0)*w,ox=ox0+(ox1-ox0)*w,oy=oy0+(oy1-oy0)*w;
   ctx.drawImage(c,ox,oy,c.width*k,c.height*k);
-  if(r<.9){const q=pathAt(c,tr);drawHand(ctx,ox+q.x*k,oy+q.y*k,W,tr)}
+  if(r<.9){const q=pathAt(c,tr);drawHand(ctx,ox+q.x*k,oy+q.y*k,W,tr,c._hand)}
 }
 /* ترسم اليد عند موضع الكتابة الزرقاء: من أعلى لأسفل، ومن اليمين لليسار في كل سطر */
 function inkHand(ctx,W,c,g,ratio){
@@ -1377,7 +1466,7 @@ function inkHand(ctx,W,c,g,ratio){
   let pos=Math.max(0,Math.min(1,ratio))*tot;
   for(const b of bs){
     const l=len(b);
-    if(pos<=l){const f=pos/l;drawHand(ctx,b.x1-f*(b.x1-b.x0),b.y+Math.sin(ratio*90)*W*.002,W,ratio);return}
+    if(pos<=l){const f=pos/l;drawHand(ctx,b.x1-f*(b.x1-b.x0),b.y+Math.sin(ratio*90)*W*.002,W,ratio,c._hand);return}
     pos-=l;
   }
 }
@@ -1423,7 +1512,7 @@ function frame(ctx,W,H,c,ans,ratio=1,k='',u=0,pr=1,hd=false,st=null){
     pos-=wi;y+=fs*1.45;if(pos<=0)break;
   }
   if(PT){pointHand(ctx,W,c,geo,pr,HD);return}
-  if(px!==null&&ratio<1&&!k&&$('himg').checked&&drawHand(ctx,px,py,W,ratio))return;
+  if(px!==null&&ratio<1&&!k&&$('himg').checked&&drawHand(ctx,px,py,W,ratio,c._hand))return;
   if(px!==null&&ratio<1){
     const L=fs*1.3,dx=L*.57,dy=-L*.82;
     ctx.save();ctx.translate(px,py);ctx.lineCap='round';
@@ -1878,7 +1967,7 @@ const pngCache=new WeakMap();
 const pngOnce=c=>{let p=pngCache.get(c);if(!p){p=pngBlob(c);pngCache.set(c,p)}return p};
 async function serPieces(){
   const ps=[];
-  for(const p of pieces)ps.push({blob:await pngOnce(p.c),ans:p.ans||'',k:p.k||'',d:p.d||0,keep:p.keep,label:p.label,full:p.rb?{sp:p.rb.sp,i:p.rb.i,mode:p.c._full?1:0}:null,o:p.c._o||null,sm:p.sm||'',pm:p.pm?1:0,pg:p.pg,y:p.y});
+  for(const p of pieces)ps.push({blob:await pngOnce(p.c),ans:p.ans||'',k:p.k||'',d:p.d||0,keep:p.keep,label:p.label,full:p.rb?{sp:p.rb.sp,i:p.rb.i,mode:p.c._full?1:0}:null,o:p.c._o||null,sm:p.sm||'',pm:p.pm?1:0,pg:p.pg,y:p.y,hand:p.hand||null});
   return ps;
 }
 const AUTO='__autosave__';
@@ -1920,7 +2009,7 @@ async function openProj(name){
       if(q.full&&q.full.sp&&q.full.sp.acts)await hydrate(q.full.sp);
       const rbk=!!(q.full&&q.full.sp&&q.full.sp.acts);
       if(rbk&&q.full.mode!==0)c._full={sp:q.full.sp,i:q.full.i,L:null};
-      out.push({c,ans:q.ans,k:q.k||'',d:q.d,keep:q.keep,label:q.label,sm:q.sm||'',pm:q.pm?1:0,pg:q.pg,y:q.y,rb:rbk?{sp:q.full.sp,i:q.full.i}:undefined});
+      out.push({c,ans:q.ans,k:q.k||'',d:q.d,keep:q.keep,label:q.label,sm:q.sm||'',pm:q.pm?1:0,pg:q.pg,y:q.y,hand:q.hand||null,rb:rbk?{sp:q.full.sp,i:q.full.i}:undefined});
     }
     pieces=out;hist=[];pages=[];ents=[];freePageUrls();renderOrd();pageCuts=[];pgc=[];$('lname').value=pr.name===AUTO?(pr.lname||''):pr.name;
     $('apg').innerHTML='';$('cut').disabled=true;
