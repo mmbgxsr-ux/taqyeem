@@ -369,9 +369,10 @@ dialog#ed,dialog#rs,dialog#hd{max-height:92vh;max-height:92dvh}
     <button class="sm" id="hlr">🖍 تظليل منطقة</button><button class="alt sm" id="hll">〰 خط</button>
     <span id="hlcols" style="display:inline-flex;gap:6px"></span>
     <button class="alt sm" id="hlun">↩ تراجع</button><button class="alt sm" id="hlclr">مسح الكل</button>
+    <button class="alt sm" id="hlzo" aria-label="تصغير">➖</button><button class="alt sm" id="hlfit">⤢ الصفحة كاملة</button><button class="alt sm" id="hlzi" aria-label="تكبير">➕</button>
   </div>
   <p class="note" id="hli">اسحب بإصبعك على الصورة لتحديد جزء. اليد ستظلله بالترتيب في الفيديو.</p>
-  <div style="overflow:auto;max-height:68vh"><canvas id="hlc" style="touch-action:none;width:100%;border:1px solid var(--line);display:block"></canvas></div>
+  <div id="hlbox" style="overflow:auto;height:68vh;height:68dvh;text-align:center"><canvas id="hlc" style="touch-action:none;max-width:none;border:1px solid var(--line);display:inline-block;vertical-align:top"></canvas></div>
 </dialog>
 <dialog id="pw" aria-label="تنبيهات قبل الفيديو">
   <b>تنبيهات قبل إنشاء الفيديو</b>
@@ -2610,8 +2611,11 @@ function openHl(pc){
   $('hlcols').innerHTML='';
   HL_COLS.forEach(col=>{const b=document.createElement('button');b.type='button';b.dataset.c=col;b.setAttribute('aria-label','لون '+col);
     b.style.cssText='width:34px;height:34px;border-radius:50%;padding:0;background:'+col;b.onclick=()=>{hlCol=col;hlTools()};$('hlcols').append(b)});
-  hlTools();hlRender();$('hld').showModal();
+  hlTools();hlRender();$('hld').showModal();hlZ=1;hlFit();
 }
+let hlZ=1;
+function hlFit(){const cv=$('hlc'),b=$('hlbox');if(!cv||!b||!hlPc)return;const bw=Math.max(100,b.clientWidth-6),bh=Math.max(100,b.clientHeight-6),f=Math.min(bw/cv.width,bh/cv.height)*hlZ;cv.style.width=Math.round(cv.width*f)+'px';cv.style.height=Math.round(cv.height*f)+'px'}
+
 (function(){
   const cv=$('hlc');if(!cv)return;
   const pos=e=>{const r=cv.getBoundingClientRect();return{x:Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)),y:Math.max(0,Math.min(1,(e.clientY-r.top)/r.height))}};
@@ -2630,6 +2634,8 @@ function openHl(pc){
   $('hlclr').onclick=()=>{hlMarks=[];hlTools();hlRender()};
   $('hlok').onclick=()=>{hlPc.hl=hlMarks.length?hlMarks:null;hlPc.c._hl=hlPc.hl;$('hld').close();draw();updTot()};
   $('hlcx').onclick=()=>$('hld').close();
+  $('hlzi').onclick=()=>{hlZ=Math.min(4,hlZ*1.4);hlFit()};$('hlzo').onclick=()=>{hlZ=Math.max(1,hlZ/1.4);hlFit()};$('hlfit').onclick=()=>{hlZ=1;hlFit();$('hlbox').scrollTo(0,0)};
+  addEventListener('resize',()=>{if($('hld').open)hlFit()});
 })();
 </script>
 </body>
