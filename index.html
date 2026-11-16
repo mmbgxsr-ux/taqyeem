@@ -375,6 +375,13 @@ dialog#ed,dialog#rs,dialog#hd{max-height:92vh;max-height:92dvh}
   <p class="note" id="hli">اسحب بإصبعك على الصورة لتحديد جزء. اليد ستظلله بالترتيب في الفيديو.</p>
   <div id="hlbox" style="overflow:auto;height:68vh;height:68dvh;text-align:center"><canvas id="hlc" style="touch-action:none;max-width:none;border:1px solid var(--line);display:inline-block;vertical-align:top"></canvas></div>
 </dialog>
+<dialog id="spd" aria-label="نقاط الصوت">
+  <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px"><b>🎵 نقاط الصوت</b><span><button id="spok">تم</button> <button id="spcx" class="alt">إلغاء</button></span></div>
+  <p class="note" id="spi">اضغط على المكان في الصورة ثم اختر ملف الصوت. يبدأ الصوت عندما يظهر هذا المكان في الشاشة أثناء الفيديو.</p>
+  <div class="row" style="gap:6px"><button class="alt sm" id="spzo" aria-label="تصغير">➖</button><button class="alt sm" id="spfit">⤢ الصفحة كاملة</button><button class="alt sm" id="spzi" aria-label="تكبير">➕</button></div>
+  <div id="spls" style="display:flex;flex-direction:column;gap:6px;margin:8px 0"></div>
+  <div id="spbox" style="overflow:auto;height:55vh;height:55dvh;text-align:center"><canvas id="spc" style="max-width:none;border:1px solid var(--line);display:inline-block;vertical-align:top;cursor:crosshair"></canvas></div>
+</dialog>
 <dialog id="pw" aria-label="تنبيهات قبل الفيديو">
   <b>تنبيهات قبل إنشاء الفيديو</b>
   <div id="pwl" style="margin:10px 0;max-height:55vh;overflow:auto"></div>
@@ -893,24 +900,25 @@ function auBtns(pc,mk){
 /* يضع صوت كل قطعة عند بدايتها فوق الصوت العام (إن وُجد) في مسار واحد */
 async function mixAudio(sel,base){
   const sfxOn=!!($('sfx')&&$('sfx').checked)&&sel.some(p=>entOf(p,dur(p))>0);
-  const mAu=p=>!!(p.hl&&p.hl.some(m=>m.au));
-  if(!sel.some(p=>p.au||mAu(p))&&!sfxOn)return base;
+  const mAu=p=>!!(p.hl&&p.hl.some(m=>m.au)),sAu=p=>!!(p.sp&&p.sp.some(q=>q.au));
+  if(!sel.some(p=>p.au||mAu(p)||sAu(p))&&!sfxOn)return base;
   const W=+$('res').value||1280,H=Math.round(W*9/16)&~1;
   const total=sel.reduce((a,p)=>a+dur(p),0),sr=AU_SR,len=Math.max(1,Math.ceil(total*sr));
   const out=mkBuf(len,sr,1),o=out.getChannelData(0);
-  const put=(b,at)=>{
+  const put=(b,at,gn)=>{gn=gn>0?gn:1;
     const r=b.sampleRate/sr,ch=b.numberOfChannels,data=[];
     for(let c=0;c<ch;c++)data.push(b.getChannelData(c));
     const s0=Math.round(at*sr),cnt=Math.min(Math.floor(b.length/r),len-s0);
     for(let i=0;i<cnt;i++){
       const x=i*r,k=x|0,fr=x-k;let v=0;
       for(let c=0;c<ch;c++){const d=data[c],a=d[k]||0,e=d[k+1]!==undefined?d[k+1]:a;v+=a+(e-a)*fr}
-      o[s0+i]+=v/ch;
+      o[s0+i]+=v/ch*gn;
     }
   };
   if(base)put(base,0);
   let t=0;
   for(const p of sel){if(p.au)put(p.au,t+.1);
+    if(sAu(p)){const dd=dur(p),E=entOf(p,dd),ts=spStarts(p);p.sp.forEach((q,i)=>{if(q.au)put(q.au,t+E+ts[i],q.vol)})}
     if(mAu(p)){p.c._hl=p.hl;if(hlOn(p)){const dd=dur(p),E=entOf(p,dd);buildTL(p,W,H,dd-E).segs.forEach(sg=>{if(sg.type==='hl'&&p.hl[sg.idx].au)put(p.hl[sg.idx].au,t+E+sg.t0+.05)})}}
     if(sfxOn&&entOf(p,dur(p))>0)addSwoosh(o,sr,t,(p.au||base)?.8:1.3);t+=dur(p);await new Promise(r=>setTimeout(r))}
   for(let i=0;i<len;i++){const v=o[i];if(v>1)o[i]=1;else if(v<-1)o[i]=-1}
@@ -973,7 +981,7 @@ function draw(){
     const inp=document.createElement('input');inp.type='number';inp.min=1;inp.max=300;inp.placeholder=dur(Object.assign({},pc,{d:0}));inp.value=pc.d||'';inp.title='مدة هذه القطعة بالثواني';inp.setAttribute('aria-label','مدة هذه القطعة بالثواني');
     inp.oninput=()=>{pc.d=+inp.value||0;updTot()};
     t.append(mk('→','قدّم القطعة',()=>mv(i,-1),i==0),mk('←','أخّر القطعة',()=>mv(i,1),i==pieces.length-1),
-      mk('✂','قسّم القطعة نصفين',()=>split(i)),mk('دمج','ادمج مع التالية',()=>merge(i),i==pieces.length-1),mk('📐','غيّر أبعاد القطعة (يُحفظ الأصل)',()=>openRs([pc]),!!pc.c._full),mk('🖍'+(pc.hl&&pc.hl.length?pc.hl.length:''),'تظليل أجزاء من القطعة (تظلّلها اليد في الفيديو)',()=>openHl(pc),!!pc.c._full),mk('🗑','احذف القطعة نهائياً (يمكن التراجع)',()=>delPieces([pc])),inp,...auBtns(pc,mk),mk('✋','اضبط موضع اليد واتجاهها لهذه القطعة'+(pc.hand?' (معدّلة)':''),()=>openHand(pc),!!pc.c._full));
+      mk('✂','قسّم القطعة نصفين',()=>split(i)),mk('دمج','ادمج مع التالية',()=>merge(i),i==pieces.length-1),mk('📐','غيّر أبعاد القطعة (يُحفظ الأصل)',()=>openRs([pc]),!!pc.c._full),mk('🖍'+(pc.hl&&pc.hl.length?pc.hl.length:''),'تظليل أجزاء من القطعة (تظلّلها اليد في الفيديو)',()=>openHl(pc),!!pc.c._full),mk('🗑','احذف القطعة نهائياً (يمكن التراجع)',()=>delPieces([pc])),inp,...auBtns(pc,mk),mk('🎵'+(pc.sp&&pc.sp.length?pc.sp.length:''),'نقاط صوت: صوت يبدأ عند ظهور مكان معين في الشاشة',()=>openSp(pc),!!pc.c._full),mk('✋','اضبط موضع اليد واتجاهها لهذه القطعة'+(pc.hand?' (معدّلة)':''),()=>openHand(pc),!!pc.c._full));
     const ta=document.createElement('textarea');ta.rows=2;ta.placeholder='الإجابة (اكتبها أو عدّلها)';ta.setAttribute('aria-label','الإجابة: '+pc.label);ta.value=pc.ans||'';
     ta.style.cssText='width:100%;margin-top:6px;font:inherit;font-size:.85rem;border:1px solid var(--line);border-radius:6px;padding:4px;background:transparent;color:inherit';
     ta.oninput=()=>{pc.ans=ta.value;pc.chk='';pc.lib=false;updTot()};ta.onchange=()=>frame(v.getContext('2d'),320,180,pc.c,pc.ans,1,pc.k,pc.u||0);
@@ -1498,7 +1506,7 @@ function camFrame(ctx,W,H,c,L,r){
   ox1=dw>W?Math.min(0,Math.max(W-dw,ox1)):(W-dw)/2;
   oy1=dh>H?Math.min(0,Math.max(H-dh,oy1)):(H-dh)/2;
   const k=k0+(k1-k0)*w,ox=ox0+(ox1-ox0)*w,oy=oy0+(oy1-oy0)*w;
-  ctx.drawImage(c,ox,oy,c.width*k,c.height*k);
+  ctx.drawImage(c,ox,oy,c.width*k,c.height*k);lastGeo={ox,oy,k,y0:0,y1:H};
   if(r<.9){const q=pathAt(c,tr);drawHand(ctx,ox+q.x*k,oy+q.y*k,W,tr,c._hand)}
 }
 /* ترسم اليد عند موضع الكتابة الزرقاء: من أعلى لأسفل، ومن اليمين لليسار في كل سطر */
@@ -1540,7 +1548,7 @@ function frame(ctx,W,H,c,ans,ratio=1,k='',u=0,pr=1,hd=false,st=null){
     if(HAL)HD={u:1,n:0,dD:0,yb:zh*.8,st};
     ctx.drawImage(c,(W-dw)/2,oy,dw,dh);
   }
-  drawMarks(ctx,c,geo,st);
+  drawMarks(ctx,c,geo,st);lastGeo=geo;
   if(!on){if(PT){pointHand(ctx,W,c,geo,pr,HD);return}if(geo&&L.sc&&hasScrollHand(c))scrollHand(ctx,W,c,geo,uIn);else if(geo&&ratio<1&&hasInkHand(c))inkHand(ctx,W,c,geo,ratio);return}
   const aw=W-2*m,ah=H-zh-m;
   ctx.strokeStyle='#c9d3ea';ctx.lineWidth=Math.max(1,W/640);ctx.beginPath();ctx.moveTo(m,zh);ctx.lineTo(W-m,zh);ctx.stroke();
@@ -2647,12 +2655,10 @@ function hlList(){
   hlMarks.forEach((m,i)=>{
     const r=document.createElement('div');r.style.cssText='display:flex;gap:4px;align-items:center;flex-wrap:wrap';
     const l=document.createElement('span');l.style.cssText='flex:1;min-width:90px';
-    l.textContent=(i+1)+'. '+(m.t==='n'?'🔢 رقم '+m.n:m.t==='f'?'▭ إطار':m.t==='l'?(m.s==='u'?'＿ تسطير':'〰 خط'):'🖍 منطقة')+(m.au?' — 🔊 '+(Math.round(m.au.duration*10)/10)+'ث':'');
+    l.textContent=(i+1)+'. '+(m.t==='n'?'🔢 رقم '+m.n:m.t==='f'?'▭ إطار':m.t==='l'?(m.s==='u'?'＿ تسطير':'〰 خط'):'🖍 منطقة')+(m.au?' — 🔊':'');
     const sw=document.createElement('span');sw.style.cssText='width:14px;height:14px;border-radius:50%;background:'+m.col;
     const mv=(k)=>()=>{const j=i+k;[hlMarks[i],hlMarks[j]]=[hlMarks[j],hlMarks[i]];hlTools();hlRender()};
-    r.append(sw,l,bt('▲','قدّم في الترتيب',mv(-1),i===0),bt('▼','أخّر في الترتيب',mv(1),i===hlMarks.length-1),
-      bt(m.au?'🔊↻':'🔊','صوت يبدأ عند ظهور هذه العلامة (اختر ملف صوت)'+(m.au?' — '+(m.auName||''):''),()=>pickAu((b,n)=>{m.au=b;m.auName=n;hlTools()})));
-    if(m.au)r.append(bt('🔇','احذف صوت هذه العلامة',()=>{m.au=null;m.auName='';hlTools()}));
+    r.append(sw,l,bt('▲','قدّم في الترتيب',mv(-1),i===0),bt('▼','أخّر في الترتيب',mv(1),i===hlMarks.length-1));
     r.append(bt('🗑','احذف العلامة',()=>{hlMarks.splice(i,1);hlTools();hlRender()}));
     box.append(r);
   });
@@ -2725,6 +2731,85 @@ function hlFit(){const cv=$('hlc'),b=$('hlbox');if(!cv||!b||!hlPc)return;const b
   $('hlcx').onclick=()=>$('hld').close();
   $('hlzi').onclick=()=>{hlZ=Math.min(8,hlZ*1.4);hlFit()};$('hlzo').onclick=()=>{hlZ=Math.max(1,hlZ/1.4);hlFit()};$('hlfit').onclick=()=>{hlZ=1;hlFit();$('hlbox').scrollTo(0,0)};
   addEventListener('resize',()=>{if($('hld').open)hlFit()});
+})();
+
+/* ---- نقاط الصوت: صوت يبدأ عند ظهور مكان معين من الصفحة في الشاشة (مستقل عن التظليل) ---- */
+/* وقت بدء كل نقطة صوت (ثوانٍ بعد انتهاء دخول القطعة). النقطة الظاهرة من البداية تبدأ مبكراً؛ وإلا عند أول لحظة يدخل فيها مكانها الشاشة */
+function spStarts(pc){
+  const sp=pc.sp||[],res=sp.map(q=>q.mode==='sec'?Math.max(0,+q.sec||0):-1);
+  if(res.every(v=>v>=0))return res;
+  try{
+    const W=+$('res').value||1280,H=Math.round(W*9/16)&~1,d=dur(pc),E=entOf(pc,d),pl=plan(pc,W,H,d-E),T=pl.S+pl.R;
+    pc.c._hl=pc.hl&&pc.hl.length?pc.hl:null;
+    const cv=document.createElement('canvas');cv.width=W;cv.height=H;const cx=cv.getContext('2d');
+    for(let e=0;e<=T+.001&&res.some(v=>v<0);e+=.1){
+      lastGeo=null;frameAt(cx,W,H,pc,E+e,d,0,pl.S,pl.R,null);const g=lastGeo;
+      sp.forEach((q,i)=>{if(res[i]>=0)return;
+        if(!g||!(g.y1-g.y0<1e8)){res[i]=.15;return}
+        const py=g.oy+q.y*pc.c.height*g.k,mg=(g.y1-g.y0)*.06;
+        if(py>=g.y0+mg&&py<=g.y1-mg)res[i]=Math.max(.15,e+.1)});
+    }
+  }catch(err){}
+  return res.map(v=>v<0?.15:v);
+}
+function spFitDur(pc){
+  if(!pc.sp||!pc.sp.some(q=>q.au))return;
+  for(let k=0;k<6;k++){
+    const d=dur(pc),E=entOf(pc,d),ts=spStarts(pc);let need=0;
+    pc.sp.forEach((q,i)=>{if(q.au)need=Math.max(need,E+ts[i]+q.au.duration+.3)});
+    if(need<=d||d>=900)break;pc.d=Math.ceil(need*10)/10;
+  }
+}
+let spPc=null,spPts=[],spZ=1,spK=1;
+function spFit(){const cv=$('spc'),b=$('spbox');if(!cv||!b||!spPc)return;const f=Math.min(Math.max(100,b.clientWidth-6)/cv.width,Math.max(100,b.clientHeight-6)/cv.height)*spZ;cv.style.width=Math.round(cv.width*f)+'px';cv.style.height=Math.round(cv.height*f)+'px'}
+function spRender(){
+  const cv=$('spc'),x=cv.getContext('2d'),c=spPc.c;
+  x.clearRect(0,0,cv.width,cv.height);x.drawImage(c,0,0,cv.width,cv.height);
+  const r=Math.max(14,cv.width*.03);
+  spPts.forEach((q,i)=>{const px=q.x*cv.width,py=q.y*cv.height;
+    x.beginPath();x.arc(px,py,r,0,7);x.fillStyle=q.au?'#1b3fa0':'#888';x.fill();x.lineWidth=r*.12;x.strokeStyle='#fff';x.stroke();
+    x.fillStyle='#fff';x.font='700 '+Math.round(r*1.05)+'px Cairo,Tahoma,sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText((i+1).toLocaleString('ar-EG'),px,py+r*.05)});
+}
+let spTmr=0;
+function spList(){
+  const box=$('spls');box.innerHTML='';
+  const ts=spStarts(Object.assign({},spPc,{sp:spPts}));
+  spPts.forEach((q,i)=>{
+    const r=document.createElement('div');r.style.cssText='display:flex;gap:6px;align-items:center;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;padding:6px';
+    const t=document.createElement('b');t.textContent=(i+1).toLocaleString('ar-EG')+'. 🔊 '+(q.auName||'')+' ('+(Math.round(q.au.duration*10)/10)+'ث)';t.style.flex='1';t.style.minWidth='120px';
+    const mode=document.createElement('select');mode.setAttribute('aria-label','متى يبدأ الصوت');
+    mode.innerHTML='<option value="screen">عند ظهور المكان في الشاشة</option><option value="sec">بعد ثوانٍ من بداية القطعة</option>';mode.value=q.mode||'screen';
+    const sec=document.createElement('input');sec.type='number';sec.min=0;sec.step=.5;sec.value=q.sec||0;sec.style.width='70px';sec.hidden=mode.value!=='sec';sec.setAttribute('aria-label','عدد الثواني');
+    const info=document.createElement('small');info.textContent='يبدأ عند ≈ '+(Math.round(ts[i]*10)/10)+'ث';
+    mode.onchange=()=>{q.mode=mode.value;spList()};sec.oninput=()=>{q.sec=+sec.value||0;clearTimeout(spTmr);spTmr=setTimeout(spList,500)};
+    const vol=document.createElement('input');vol.type='range';vol.min=10;vol.max=200;vol.value=Math.round((q.vol||1)*100);vol.title='مستوى الصوت';vol.setAttribute('aria-label','مستوى الصوت');vol.style.width='90px';vol.oninput=()=>{q.vol=vol.value/100};
+    const bt=(tx,tip,fn)=>{const b=document.createElement('button');b.type='button';b.className='alt sm';b.textContent=tx;b.title=tip;b.setAttribute('aria-label',tip);b.onclick=fn;return b};
+    r.append(t,mode,sec,info,vol,
+      bt('▶','تجربة الصوت',()=>{try{const AC=window.AudioContext||window.webkitAudioContext,ac=new AC(),s=ac.createBufferSource(),gn=ac.createGain();s.buffer=q.au;gn.gain.value=q.vol||1;s.connect(gn);gn.connect(ac.destination);s.start();s.onended=()=>ac.close()}catch(e){}}),
+      bt('🔁','استبدل ملف الصوت',()=>pickAu((b,n)=>{q.au=b;q.auName=n;spList();spRender()})),
+      bt('🗑','احذف نقطة الصوت',()=>{spPts.splice(i,1);spList();spRender()}));
+    box.append(r);
+  });
+}
+function openSp(pc){
+  spPc=pc;spPts=(pc.sp||[]).map(q=>Object.assign({},q));
+  /* صوت كان مربوطاً بعلامة تظليل ينتقل إلى نقطة صوت في مكان العلامة */
+  (pc.hl||[]).forEach(m=>{if(m.au){spPts.push({x:(m.x0+m.x1)/2,y:Math.min(m.y0,m.y1),au:m.au,auName:m.auName,mode:'screen',vol:1});m.au=null;m.auName=''}});
+  const cv=$('spc');spK=Math.min(1,2000/pc.c.width,6000/pc.c.height);
+  cv.width=Math.max(1,Math.round(pc.c.width*spK));cv.height=Math.max(1,Math.round(pc.c.height*spK));
+  spZ=1;spRender();$('spd').showModal();spFit();spList();
+}
+(function(){
+  const cv=$('spc');if(!cv)return;
+  cv.addEventListener('click',e=>{
+    const r=cv.getBoundingClientRect(),x=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)),y=Math.max(0,Math.min(1,(e.clientY-r.top)/r.height));
+    if(spPts.length>=30)return;
+    pickAu((b,n)=>{spPts.push({x,y,au:b,auName:n,mode:'screen',vol:1});spList();spRender()});
+  });
+  $('spzi').onclick=()=>{spZ=Math.min(8,spZ*1.4);spFit()};$('spzo').onclick=()=>{spZ=Math.max(1,spZ/1.4);spFit()};$('spfit').onclick=()=>{spZ=1;spFit();$('spbox').scrollTo(0,0)};
+  $('spok').onclick=()=>{spPc.sp=spPts.length?spPts:null;spFitDur(spPc);$('spd').close();draw();updTot()};
+  $('spcx').onclick=()=>{$('spd').close();draw()};
+  addEventListener('resize',()=>{if($('spd').open)spFit()});
 })();
 </script>
 </body>
