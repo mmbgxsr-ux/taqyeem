@@ -366,11 +366,12 @@ dialog#ed,dialog#rs,dialog#hd{max-height:92vh;max-height:92dvh}
 <dialog id="hld" aria-label="تظليل أجزاء من القطعة">
   <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px"><b>🖍 تظليل أجزاء من القطعة</b><span><button id="hlok">تم</button> <button id="hlcx" class="alt">إلغاء</button></span></div>
   <div class="row" style="gap:6px;align-items:center">
-    <button class="sm" id="hlr">🖍 تظليل منطقة</button><button class="alt sm" id="hll">〰 خط</button>
+    <button class="sm" id="hlr">🖍 تظليل منطقة</button><button class="alt sm" id="hll">〰 خط</button><button class="alt sm" id="hln">🔢 رقم</button>
     <span id="hlcols" style="display:inline-flex;gap:6px"></span>
     <button class="alt sm" id="hlun">↩ تراجع</button><button class="alt sm" id="hlclr">مسح الكل</button>
     <button class="alt sm" id="hlzo" aria-label="تصغير">➖</button><button class="alt sm" id="hlfit">⤢ الصفحة كاملة</button><button class="alt sm" id="hlzi" aria-label="تكبير">➕</button>
   </div>
+  <div id="hlls" style="display:flex;flex-direction:column;gap:4px;margin:6px 0"></div>
   <p class="note" id="hli">اسحب بإصبعك على الصورة لتحديد جزء. اليد ستظلله بالترتيب في الفيديو.</p>
   <div id="hlbox" style="overflow:auto;height:68vh;height:68dvh;text-align:center"><canvas id="hlc" style="touch-action:none;max-width:none;border:1px solid var(--line);display:inline-block;vertical-align:top"></canvas></div>
 </dialog>
@@ -885,7 +886,9 @@ function auBtns(pc,mk){
 /* يضع صوت كل قطعة عند بدايتها فوق الصوت العام (إن وُجد) في مسار واحد */
 async function mixAudio(sel,base){
   const sfxOn=!!($('sfx')&&$('sfx').checked)&&sel.some(p=>entOf(p,dur(p))>0);
-  if(!sel.some(p=>p.au)&&!sfxOn)return base;
+  const mAu=p=>!!(p.hl&&p.hl.some(m=>m.au));
+  if(!sel.some(p=>p.au||mAu(p))&&!sfxOn)return base;
+  const W=+$('res').value||1280,H=Math.round(W*9/16)&~1;
   const total=sel.reduce((a,p)=>a+dur(p),0),sr=AU_SR,len=Math.max(1,Math.ceil(total*sr));
   const out=mkBuf(len,sr,1),o=out.getChannelData(0);
   const put=(b,at)=>{
@@ -900,7 +903,9 @@ async function mixAudio(sel,base){
   };
   if(base)put(base,0);
   let t=0;
-  for(const p of sel){if(p.au)put(p.au,t+.1);if(sfxOn&&entOf(p,dur(p))>0)addSwoosh(o,sr,t,(p.au||base)?.8:1.3);t+=dur(p);await new Promise(r=>setTimeout(r))}
+  for(const p of sel){if(p.au)put(p.au,t+.1);
+    if(mAu(p)){p.c._hl=p.hl;if(hlOn(p)){const dd=dur(p),E=entOf(p,dd);buildTL(p,W,H,dd-E).segs.forEach(sg=>{if(sg.type==='hl'&&p.hl[sg.idx].au)put(p.hl[sg.idx].au,t+E+sg.t0+.05)})}}
+    if(sfxOn&&entOf(p,dur(p))>0)addSwoosh(o,sr,t,(p.au||base)?.8:1.3);t+=dur(p);await new Promise(r=>setTimeout(r))}
   for(let i=0;i<len;i++){const v=o[i];if(v>1)o[i]=1;else if(v<-1)o[i]=-1}
   return out;
 }
@@ -1270,20 +1275,27 @@ const HL_COLS=['#ffe14d','#8be58f','#ff9ecb','#ff8a80'];
 const hlOn=pc=>!!(ptOn()&&$('hal')&&$('hal').checked&&$('himg')&&$('himg').checked&&pc.c&&!pc.c._full&&pc.c._hl&&pc.c._hl.length);
 function markInfo(c,g,mk){
   const cw=c.width*g.k,ch=c.height*g.k,X=v=>g.ox+v*cw,Y=v=>g.oy+v*ch;
+  if(mk.t==='n'){const a={x:X(mk.x0),y:Y(mk.y0)};return{t:'n',a,b:a,flip:true}}
   if(mk.t==='l'){const a={x:X(mk.x0),y:Y(mk.y0)},b={x:X(mk.x1),y:Y(mk.y1)};return{t:'l',a,b,flip:b.x<a.x,lw:Math.max(3,cw*.011)}}
   const X0=X(Math.min(mk.x0,mk.x1)),X1=X(Math.max(mk.x0,mk.x1)),Y0=Y(Math.min(mk.y0,mk.y1)),Y1=Y(Math.max(mk.y0,mk.y1));
   const nb=Math.max(1,Math.ceil((Y1-Y0)/(cw*.035)-.15)),bh=(Y1-Y0)/nb;
   return{t:'r',X0,X1,Y0,Y1,nb,bh,flip:true};
 }
 function markTipAt(mi,p){
-  if(mi.t==='l')return{x:mi.a.x+(mi.b.x-mi.a.x)*p,y:mi.a.y+(mi.b.y-mi.a.y)*p};
+  if(mi.t!=='r')return{x:mi.a.x+(mi.b.x-mi.a.x)*p,y:mi.a.y+(mi.b.y-mi.a.y)*p};
   const w=mi.X1-mi.X0,s=Math.min(.9999,Math.max(0,p))*mi.nb,j=Math.floor(s),f=s-j;
   return{x:mi.X1-f*w,y:mi.Y0+(j+.5)*mi.bh};
 }
 function paintMark(ctx,c,g,mk,p){
   const mi=markInfo(c,g,mk);
   ctx.save();
-  if(mi.t==='l'){
+  if(mi.t==='n'){
+    const r=Math.max(12,c.width*g.k*.03),sc=p<.6?p/.6*1.2:1.2-(p-.6)/.4*.2;
+    ctx.globalAlpha=Math.min(1,p*2.5);ctx.translate(mi.a.x,mi.a.y);ctx.scale(sc,sc);
+    ctx.beginPath();ctx.arc(0,0,r,0,7);ctx.fillStyle=mk.col;ctx.fill();ctx.lineWidth=r*.14;ctx.strokeStyle='#222';ctx.stroke();
+    ctx.fillStyle='#111';ctx.font='700 '+Math.round(r*1.15)+'px Cairo,Tahoma,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText((mk.n||1).toLocaleString('ar-EG'),0,r*.06);
+  }else if(mi.t==='l'){
     const e=markTipAt(mi,p);
     ctx.globalAlpha=.92;ctx.strokeStyle=mk.col;ctx.lineWidth=mi.lw;ctx.lineCap='round';
     ctx.beginPath();ctx.moveTo(mi.a.x,mi.a.y);ctx.lineTo(e.x,e.y);ctx.stroke();
@@ -1304,18 +1316,18 @@ function drawMarks(ctx,c,g,st){
 }
 function markHand(ctx,W,c,g,hs,gx,yb){
   const hl=c._hl,cl=x=>Math.max(0,Math.min(1,x));
-  const dw=(x,y,flip,a)=>{ctx.save();ctx.globalAlpha=a;drawHand(ctx,x,y,W,{k:'write',slide:0,flip});ctx.restore()};
+  const dw=(x,y,flip,a,kk)=>{ctx.save();ctx.globalAlpha=a;drawHand(ctx,x,y,W,{k:kk||'write',slide:0,flip});ctx.restore()};
   const dh=(x,y,a)=>{ctx.save();ctx.globalAlpha=a;drawHand(ctx,x,y,W,{k:'hold',slide:0,flip:true});ctx.restore()};
   if(hs.type==='hl'){
-    const mi=markInfo(c,g,hl[hs.idx]),f=hs.f;
+    const mi=markInfo(c,g,hl[hs.idx]),f=hs.f,kk=mi.t==='n'?'point':'write';
     const from=hs.prev>=0?markTipAt(markInfo(c,g,hl[hs.prev]),1):{x:gx,y:yb};
     if(f<.2){
       const t=ez(f/.2),s0=markTipAt(mi,0),x=from.x+(s0.x-from.x)*t,y=from.y+(s0.y-from.y)*t;
-      if(hs.prev<0){dh(x,y,1-t);dw(x,y,mi.flip,t)}else dw(x,y,mi.flip,1);
-    }else{const tp=markTipAt(mi,cl((f-.2)/.8));dw(tp.x,tp.y,mi.flip,1)}
+      if(hs.prev<0){dh(x,y,1-t);dw(x,y,mi.flip,t,kk)}else dw(x,y,mi.flip,1,kk);
+    }else{const tp=markTipAt(mi,cl((f-.2)/.8));dw(tp.x,tp.y,mi.flip,1,kk)}
   }else{
     const mi=markInfo(c,g,hl[hs.prev]),e=markTipAt(mi,1),t=ez(hs.f),x=e.x+(gx-e.x)*t,y=e.y+(yb-e.y)*t;
-    dw(x,y,mi.flip,1-t);dh(x,y,t);
+    dw(x,y,mi.flip,1-t,mi.t==='n'?'point':'write');dh(x,y,t);
   }
 }
 /* خطة زمنية للقطعة التي عليها علامات: إشارة ← (تظليل علامات المكان الحالي ← سحبة) × عدد المحطات */
@@ -1329,7 +1341,7 @@ function scrollInfo(c,W,H,on){
 }
 function buildTL(pc,W,H,d){
   const c=pc.c,hl=c._hl,on=!!pc.ans&&$('hand').checked;
-  const key=[W,H,d.toFixed(3),on,JSON.stringify(hl)].join('|');
+  const key=[W,H,d.toFixed(3),on,JSON.stringify(hl),hl.map(m=>m.au?m.au.duration:0).join(',')].join('|');
   if(c._tl&&c._tl.key===key)return c._tl;
   const si=scrollInfo(c,W,H,on),L=si.L,P=ptWin(d),R0=Math.max(.5,d-P);
   const stopOf=hl.map(mk=>{
@@ -1339,13 +1351,15 @@ function buildTL(pc,W,H,d){
     return Math.min(si.n,Math.max(0,Math.floor(top/si.dD)));
   });
   const nm=hl.length,ns=new Set(stopOf).size;
-  const Tm=Math.max(.35,Math.min(2,(.6*R0-ns*.3)/nm)),Mt=nm*Tm+ns*.3;
+  /* علامة لها صوت تبقى بمدة صوتها؛ الباقي يتقاسم الوقت المتاح */
+  const Ta=hl.map(m=>m.au?Math.max(.6,m.au.duration+.25):0),sA=Ta.reduce((a,b)=>a+b,0),nF=Ta.filter(v=>!v).length;
+  const Tm=Math.max(.35,Math.min(2,nF?(.6*R0-ns*.3-sA)/nF:.35)),Ti=Ta.map(v=>v||Tm),Mt=Ti.reduce((a,b)=>a+b,0)+ns*.3;
   const ST=si.n?plan0(pc,W,H,Math.max(.5,R0-Mt)).S:0,sd=si.n?ST/si.n:0;
   const segs=[];let t=P;
   for(let s=0;s<=si.n;s++){
     const ms=[];stopOf.forEach((st,i)=>{if(st===s)ms.push(i)});
     let prev=-1;
-    ms.forEach(i=>{segs.push({type:'hl',t0:t,t1:t+Tm,idx:i,prev});t+=Tm;prev=i});
+    ms.forEach(i=>{segs.push({type:'hl',t0:t,t1:t+Ti[i],idx:i,prev});t+=Ti[i];prev=i});
     if(ms.length){segs.push({type:'appr',t0:t,t1:t+.3,prev});t+=.3}
     if(s<si.n){segs.push({type:'stroke',t0:t,t1:t+sd,i:s});t+=sd}
   }
@@ -1364,7 +1378,7 @@ function buildTL(pc,W,H,d){
     }
     st.u=n?1:0;return st;
   };
-  return c._tl={key,total:t,at};
+  return c._tl={key,total:t,at,segs};
 }
 
 /* ---- انتقال القطع: سحب باليد (دخول/خروج) أو قلب صفحة أو تلاشي ---- */
@@ -2595,10 +2609,34 @@ function hlRender(){
   const cv=$('hlc'),x=cv.getContext('2d'),c=hlPc.c,g={ox:0,oy:0,k:hlK};
   x.clearRect(0,0,cv.width,cv.height);x.drawImage(c,0,0,cv.width,cv.height);
   hlMarks.forEach(m=>paintMark(x,c,g,m,1));
-  if(hlDrag)paintMark(x,c,g,Object.assign({t:hlTool,col:hlCol},hlDrag),1);
+  if(hlDrag)paintMark(x,c,g,hlTool==='n'?{t:'n',col:hlCol,x0:hlDrag.x1,y0:hlDrag.y1,x1:hlDrag.x1,y1:hlDrag.y1,n:hlMarks.filter(m=>m.t==='n').length+1}:Object.assign({t:hlTool,col:hlCol},hlDrag),1);
+}
+function hlNum(){let k=0;hlMarks.forEach(m=>{if(m.t==='n')m.n=++k})}
+function hlList(){
+  const box=$('hlls');if(!box)return;box.innerHTML='';
+  const bt=(t,tip,fn,dis)=>{const b=document.createElement('button');b.type='button';b.className='alt sm';b.textContent=t;b.title=tip;b.setAttribute('aria-label',tip);b.disabled=!!dis;b.onclick=fn;return b};
+  hlMarks.forEach((m,i)=>{
+    const r=document.createElement('div');r.style.cssText='display:flex;gap:4px;align-items:center;flex-wrap:wrap';
+    const l=document.createElement('span');l.style.cssText='flex:1;min-width:90px';
+    l.textContent=(i+1)+'. '+(m.t==='n'?'🔢 رقم '+m.n:m.t==='l'?'〰 خط':'🖍 منطقة')+(m.au?' — 🔊 '+(Math.round(m.au.duration*10)/10)+'ث':'');
+    const sw=document.createElement('span');sw.style.cssText='width:14px;height:14px;border-radius:50%;background:'+m.col;
+    const mv=(k)=>()=>{const j=i+k;[hlMarks[i],hlMarks[j]]=[hlMarks[j],hlMarks[i]];hlTools();hlRender()};
+    r.append(sw,l,bt('▲','قدّم في الترتيب',mv(-1),i===0),bt('▼','أخّر في الترتيب',mv(1),i===hlMarks.length-1),
+      bt(m.au?'🔊↻':'🔊','صوت يبدأ عند ظهور هذه العلامة (اختر ملف صوت)'+(m.au?' — '+(m.auName||''):''),()=>pickAu((b,n)=>{m.au=b;m.auName=n;hlTools()})));
+    if(m.au)r.append(bt('🔇','احذف صوت هذه العلامة',()=>{m.au=null;m.auName='';hlTools()}));
+    r.append(bt('🗑','احذف العلامة',()=>{hlMarks.splice(i,1);hlTools();hlRender()}));
+    box.append(r);
+  });
+}
+function hlFitDur(pc){
+  if(!pc.hl||!pc.hl.some(m=>m.au))return;
+  pc.c._hl=pc.hl;if(!hlOn(pc))return;
+  const W=+$('res').value||1280,H=Math.round(W*9/16)&~1,d0=dur(pc);let d=d0;
+  for(let k=0;k<300&&d<900;k++){const E=entOf(pc,d);if(buildTL(pc,W,H,d-E).total<=d-E-.2)break;d=Math.round((d+.5)*10)/10}
+  if(d>d0)pc.d=d;
 }
 function hlTools(){
-  $('hlr').className=hlTool==='r'?'sm':'alt sm';$('hll').className=hlTool==='l'?'sm':'alt sm';
+  hlNum();$('hlr').className=hlTool==='r'?'sm':'alt sm';$('hll').className=hlTool==='l'?'sm':'alt sm';$('hln').className=hlTool==='n'?'sm':'alt sm';hlList();
   [...$('hlcols').children].forEach(b=>{b.style.outline=b.dataset.c===hlCol?'3px solid var(--acc)':'1px solid var(--line)'});
   $('hlun').disabled=!hlMarks.length;$('hlclr').disabled=!hlMarks.length;
   $('hli').textContent=hlMarks.length?hlMarks.length+' علامة. اليد ستظلّلها بنفس ترتيب رسمها.':'اسحب بإصبعك على الصورة لتحديد جزء. اليد ستظلله بالترتيب في الفيديو.';
@@ -2624,15 +2662,15 @@ function hlFit(){const cv=$('hlc'),b=$('hlbox');if(!cv||!b||!hlPc)return;const b
   const end=()=>{
     if(!hlDrag)return;const d=hlDrag;hlDrag=null;
     const dx=Math.abs(d.x1-d.x0),dy=Math.abs(d.y1-d.y0),ar=hlPc.c.height/hlPc.c.width;
-    const ok=hlTool==='r'?(dx>.015&&dy*ar>.004):(Math.hypot(dx,dy*ar)>.02);
-    if(ok&&hlMarks.length<40)hlMarks.push({t:hlTool,col:hlCol,x0:d.x0,y0:d.y0,x1:d.x1,y1:d.y1});
+    const ok=hlTool==='n'?true:hlTool==='r'?(dx>.015&&dy*ar>.004):(Math.hypot(dx,dy*ar)>.02);
+    if(ok&&hlMarks.length<40)hlMarks.push(hlTool==='n'?{t:'n',col:hlCol,x0:d.x1,y0:d.y1,x1:d.x1,y1:d.y1}:{t:hlTool,col:hlCol,x0:d.x0,y0:d.y0,x1:d.x1,y1:d.y1});
     hlTools();hlRender();
   };
   cv.addEventListener('pointerup',end);cv.addEventListener('pointercancel',end);
-  $('hlr').onclick=()=>{hlTool='r';hlTools()};$('hll').onclick=()=>{hlTool='l';hlTools()};
+  $('hlr').onclick=()=>{hlTool='r';hlTools()};$('hll').onclick=()=>{hlTool='l';hlTools()};$('hln').onclick=()=>{hlTool='n';hlTools()};
   $('hlun').onclick=()=>{hlMarks.pop();hlTools();hlRender()};
   $('hlclr').onclick=()=>{hlMarks=[];hlTools();hlRender()};
-  $('hlok').onclick=()=>{hlPc.hl=hlMarks.length?hlMarks:null;hlPc.c._hl=hlPc.hl;$('hld').close();draw();updTot()};
+  $('hlok').onclick=()=>{hlPc.hl=hlMarks.length?hlMarks:null;hlPc.c._hl=hlPc.hl;hlFitDur(hlPc);$('hld').close();draw();updTot()};
   $('hlcx').onclick=()=>$('hld').close();
   $('hlzi').onclick=()=>{hlZ=Math.min(4,hlZ*1.4);hlFit()};$('hlzo').onclick=()=>{hlZ=Math.max(1,hlZ/1.4);hlFit()};$('hlfit').onclick=()=>{hlZ=1;hlFit();$('hlbox').scrollTo(0,0)};
   addEventListener('resize',()=>{if($('hld').open)hlFit()});
